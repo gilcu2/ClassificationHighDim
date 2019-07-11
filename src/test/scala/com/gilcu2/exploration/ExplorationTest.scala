@@ -3,7 +3,7 @@ package com.gilcu2.exploration
 import com.gilcu2.interfaces.Spark._
 import org.scalatest._
 import testUtil.SparkSessionTestWrapper
-import org.apache.spark.sql.functions._
+
 
 class ExplorationTest extends FlatSpec with Matchers with GivenWhenThen with SparkSessionTestWrapper {
 
@@ -17,12 +17,10 @@ class ExplorationTest extends FlatSpec with Matchers with GivenWhenThen with Spa
     val data = loadCSVFromFile("data/sample.csv")
 
     When("the is described")
-    val summary = Exploration.summarize(data)
+    val summary = Exploration.summarizeFields(data)
 
-    Then(" the description must be the expected")
-    val x001 = summary.select("summary", "x001")
-    val count = x001.filter("summary == count").collect
-    count shouldBe 100
+    Then(" the description must have the number of fields expected")
+    summary.size shouldBe 305
 
   }
 

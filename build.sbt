@@ -30,7 +30,7 @@ mainClass in(Compile, run) := Some("com.gilcu2.ClassifierMain")
 
 test in assembly := {}
 
-assemblyJarName in assembly := "phonelogs.jar"
+assemblyJarName in assembly := "classifier.jar"
 
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs@_*) => MergeStrategy.discard
