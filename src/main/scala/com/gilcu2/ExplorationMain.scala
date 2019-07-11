@@ -26,6 +26,8 @@ object ExplorationMain extends LazyLogging {
     logger.info(s"Begin: $beginTime")
     logger.info(s"Arguments: $args")
 
+    println(s"Begin: $beginTime")
+
     implicit val conf = ConfigFactory.load
     val sparkConf = new SparkConf().setAppName("Exploration")
     implicit val spark = Spark.sparkSession(sparkConf)
@@ -38,6 +40,7 @@ object ExplorationMain extends LazyLogging {
     val endTime = getCurrentTime
     val humanTime = getHumanDuration(beginTime, endTime)
     logger.info(s"End: $endTime Total: $humanTime")
+    println(s"End: $endTime Total: $humanTime")
 
   }
 
@@ -49,13 +52,8 @@ object ExplorationMain extends LazyLogging {
     val data = Spark.loadCSVFromFile(inputPath)
     data.show
 
-    val fieldSummaries = Exploration.summarizeFields(data)
-
-    println("Fields summary")
-    println("Name\tMin\tMax")
-    fieldSummaries.foreach(summary =>
-      println(s"${summary.name}\t${summary.min}\t${summary.max}")
-    )
+    val dataSummary = Exploration.summarizeFields(data)
+    Exploration.printDataSummary(dataSummary)
 
   }
 
