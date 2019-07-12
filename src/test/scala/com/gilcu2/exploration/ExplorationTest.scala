@@ -40,27 +40,6 @@ class ExplorationTest extends FlatSpec with Matchers with GivenWhenThen with Spa
 
   }
 
-  it should "count the number of nulls per column" in {
-
-    Given("the data")
-    val lines =
-      """
-        |A,B,C
-        |,1,2
-        |3,,4
-        |4,,6
-        |1,2,3
-      """.cleanLines
-    val data = loadCSVFromLines(spark.createDataset(lines))
-
-    When("the counting is done")
-    val columnsNullCount = Exploration.countNullsPerColumn(data)
-
-    Then("the columns with null must be A,B")
-    columnsNullCount.toSet shouldBe Set(("A", 1L), ("B", 2L), ("C", 0L))
-
-  }
-
   it should "count the number of rows with at least one null" in {
 
     Given("the data")

@@ -6,7 +6,7 @@ import com.typesafe.config.Config
 import org.apache.spark.sql.SparkSession
 import org.rogach.scallop.ScallopConf
 
-object ExplorationMain extends MainTrait {
+object PreProcessingMain extends MainTrait {
 
   class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val logCountsAndTimes = opt[Boolean]()

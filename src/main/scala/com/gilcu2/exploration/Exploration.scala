@@ -1,10 +1,9 @@
 package com.gilcu2.exploration
 
-import java.security.KeyStore.TrustedCertificateEntry
-
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
+import com.gilcu2.interfaces.Spark._
 
 case class DataSummary(size: Long, dim: Int, fields: Seq[String],
                        booleanFields: Seq[String], integerFields: Seq[String],
@@ -36,7 +35,7 @@ object Exploration extends LazyLogging {
 
     val classesSize = computeClassesSizes(df)
 
-    val nullsPerColumn = countNullsPerColumn(df)
+    val nullsPerColumn = df.countNullsPerColumn
     val nullRows = countRowsWithNullOrEmptyString(df)
 
     DataSummary(size, dim, fieldNames, booleanFields, integerFields, realFields, otherFields,
@@ -45,20 +44,23 @@ object Exploration extends LazyLogging {
   }
 
   def computeClassesSizes(df: DataFrame): Seq[(Int, Long)] = {
-    val r = df.select("y")
-      .groupBy("y")
-      .agg(count("y"))
-      .collect()
-      .map(r => (r.getInt(0), r.getLong(1)))
-      .sortBy(_._2)
-      .reverse
+    if (df.existColumn("y")) {
+      val r = df.select("y")
+        .groupBy("y")
+        .agg(count("y"))
+        .collect()
+        .map(r => (r.getInt(0), r.getLong(1)))
+        .sortBy(_._2)
+        .reverse
 
-    val sumClassesSize = r.map(_._2).sum
-    if (sumClassesSize != df.count) {
-      logger.warn(s"Sumclasses size $sumClassesSize differenet of data size")
+      val sumClassesSize = r.map(_._2).sum
+      if (sumClassesSize != df.count) {
+        logger.warn(s"Sumclasses size $sumClassesSize differenet of data size")
+      }
+
+      r
     }
-
-    r
+    else Seq[(Int, Long)]()
   }
 
   def computeFieldsSummary(df: DataFrame, dim: Integer, fieldNames: Array[String]): Seq[FieldSummary] = {
@@ -99,22 +101,6 @@ object Exploration extends LazyLogging {
     case _ => false
   }
 
-  def countNullsPerColumn(df: DataFrame): Seq[(String, Long)] = {
-    val allColumns = df.columns
-    val rowResults = df
-      .select(allColumns.map(c => (sum(when(col(c).isNull, 1))).alias(c)): _*)
-      .head()
-
-    (0 to allColumns.size - 1).map(col =>
-      if (rowResults.isNullAt(col))
-        (allColumns(col), 0L)
-      else
-        (allColumns(col), rowResults.getLong(col))
-    )
-      .sortBy(_._2)
-      .reverse
-
-  }
 
   def countRowsWithNullOrEmptyString(df: DataFrame): Long = {
     val cond = df.columns.map(x => col(x).isNull || col(x) === "").reduce(_ || _)
@@ -139,8 +125,10 @@ object Exploration extends LazyLogging {
     printFieldTypes("Real", dataSummary.realFields)
     printFieldTypes("Other", dataSummary.otherFields)
 
-    println(s"Classes: ${dataSummary.classesSize.size}")
-    dataSummary.classesSize.foreach(pair => println(s"${pair._1}\t${pair._2}"))
+    if (dataSummary.classesSize.nonEmpty) {
+      println(s"Classes: ${dataSummary.classesSize.size}")
+      dataSummary.classesSize.foreach(pair => println(s"${pair._1}\t${pair._2}"))
+    }
 
     println(s"\nRows with null: ${dataSummary.nullRows}")
 
