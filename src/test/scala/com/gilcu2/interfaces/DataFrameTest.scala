@@ -112,10 +112,10 @@ class DataFrameTest extends FlatSpec with Matchers with GivenWhenThen with Spark
     val withFeatureVector = data.toFeatureVector
 
     When("the data is transformed")
-    val withLabeledPoint =
+    val withLabeledPoint = withFeatureVector.toLabeledPoints
 
       Then("the columns with null must be A,B")
-    withFeatureVector.columns shouldBe Array("y", "features")
+    withLabeledPoint.count shouldBe 4
 
   }
 

@@ -73,6 +73,8 @@ object DataFrame {
         .option("header", true)
         .json(path)
 
+      println(s"json $path saved")
+
     }
 
     def countRowsWithNullOrEmptyString: Long = {
@@ -103,10 +105,10 @@ object DataFrame {
         withFeatures.select("features")
     }
 
-    def toLabeledPoints(implicit spark: SparkSession): DataFrame = {
+    def toLabeledPoints(implicit spark: SparkSession): Dataset[LabeledPoint] = {
       import spark.implicits._
-      df.map(row => Row(LabeledPoint(row.getAs[Double]("y"),
-        row.getAs[linalg.Vector]("features"))))
+      df.map(row => LabeledPoint(row.getAs[Int]("y").toDouble,
+        row.getAs[linalg.Vector]("features")))
     }
 
 
