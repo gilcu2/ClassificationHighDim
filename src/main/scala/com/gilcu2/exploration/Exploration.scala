@@ -2,17 +2,20 @@ package com.gilcu2.exploration
 
 import java.security.KeyStore.TrustedCertificateEntry
 
-import org.apache.spark.sql.{DataFrame, Dataset}
-
-import scala.collection.immutable
+import com.typesafe.scalalogging.LazyLogging
+import org.apache.spark.sql._
+import org.apache.spark.sql.functions._
 
 case class DataSummary(size: Long, dim: Int, fields: Seq[String],
                        booleanFields: Seq[String], integerFields: Seq[String],
                        realFields: Seq[String], otherFields: Seq[String],
-                       fieldsSummary: Seq[FieldSummary])
+                       fieldsSummary: Seq[FieldSummary], classesSize: Seq[(Int, Long)],
+                       nullCountPerColumn: Seq[(String, Long)], nullRows: Long
+                      )
+
 case class FieldSummary(name: String, min: String, max: String)
 
-object Exploration {
+object Exploration extends LazyLogging {
   val dotCeroRegex = "([0-9]+).0".r
   val integerRegex = "^(-?[0-9]+)$".r
   val realRegex = "^(-?[0-9]+.[0-9]+)$".r
@@ -31,9 +34,93 @@ object Exploration {
     val realFields = fieldTypes.filter(_._2 == 'R').map(_._1.name)
     val otherFields = fieldTypes.filter(_._2 == 'O').map(_._1.name)
 
-    DataSummary(size, dim, fieldNames, booleanFields, integerFields, realFields, otherFields, fieldsSummary)
+    val classesSize = computeClassesSizes(df)
+
+    val nullsPerColumn = countNullsPerColumn(df)
+    val nullRows = countRowsWithNullOrEmptyString(df)
+
+    DataSummary(size, dim, fieldNames, booleanFields, integerFields, realFields, otherFields,
+      fieldsSummary, classesSize, nullsPerColumn, nullRows)
 
   }
+
+  def computeClassesSizes(df: DataFrame): Seq[(Int, Long)] = {
+    val r = df.select("y")
+      .groupBy("y")
+      .agg(count("y"))
+      .collect()
+      .map(r => (r.getInt(0), r.getLong(1)))
+      .sortBy(_._2)
+      .reverse
+
+    val sumClassesSize = r.map(_._2).sum
+    if (sumClassesSize != df.count) {
+      logger.warn(s"Sumclasses size $sumClassesSize differenet of data size")
+    }
+
+    r
+  }
+
+  def computeFieldsSummary(df: DataFrame, dim: Integer, fieldNames: Array[String]): Seq[FieldSummary] = {
+    val summary = df.summary("min", "max").collect
+    (1 to dim).map(col =>
+      FieldSummary(
+        fieldNames(col - 1),
+        removeDotZero(summary(0).getString(col)),
+        removeDotZero(summary(1).getString(col)))
+    )
+  }
+
+  def removeDotZero(s: String): String = s match {
+    case dotCeroRegex(number) => number
+    case _ => s
+  }
+
+  def computeFieldType(summary: FieldSummary): (FieldSummary, Char) = {
+    summary match {
+      case FieldSummary(_, "0", "1") =>
+        (summary, 'B')
+      case FieldSummary(_, min, max) if isInteger(min) && isInteger(max) =>
+        (summary, 'I')
+      case FieldSummary(_, min, max) if isReal(min) || isReal(max) =>
+        (summary, 'R')
+      case _ =>
+        (summary, 'O')
+    }
+  }
+
+  def isInteger(s: String): Boolean = s match {
+    case integerRegex(_) => true
+    case _ => false
+  }
+
+  def isReal(s: String): Boolean = s match {
+    case realRegex(_) => true
+    case _ => false
+  }
+
+  def countNullsPerColumn(df: DataFrame): Seq[(String, Long)] = {
+    val allColumns = df.columns
+    val rowResults = df
+      .select(allColumns.map(c => (sum(when(col(c).isNull, 1))).alias(c)): _*)
+      .head()
+
+    (0 to allColumns.size - 1).map(col =>
+      if (rowResults.isNullAt(col))
+        (allColumns(col), 0L)
+      else
+        (allColumns(col), rowResults.getLong(col))
+    )
+      .sortBy(_._2)
+      .reverse
+
+  }
+
+  def countRowsWithNullOrEmptyString(df: DataFrame): Long = {
+    val cond = df.columns.map(x => col(x).isNull || col(x) === "").reduce(_ || _)
+    df.filter(cond).count
+  }
+
 
   def printDataSummary(dataSummary: DataSummary, inputPath: String): Unit = {
 
@@ -52,50 +139,20 @@ object Exploration {
     printFieldTypes("Real", dataSummary.realFields)
     printFieldTypes("Other", dataSummary.otherFields)
 
-    println("Fields summary")
+    println(s"Classes: ${dataSummary.classesSize.size}")
+    dataSummary.classesSize.foreach(pair => println(s"${pair._1}\t${pair._2}"))
+
+    println(s"\nRows with null: ${dataSummary.nullRows}")
+
+    println(s"Columns with nulls: ${dataSummary.nullCountPerColumn.count(_._2 > 0)}")
+    println("Nulls per column")
+    dataSummary.nullCountPerColumn.foreach(pair => println(s"${pair._1}\t${pair._2}"))
+
+    println("\nFields summary")
     println("Name\tMin\tMax")
     dataSummary.fieldsSummary.foreach(summary =>
       println(s"${summary.name}\t${summary.min}\t${summary.max}")
     )
-  }
-
-
-  def removeDotZero(s: String): String = s match {
-    case dotCeroRegex(number) => number
-    case _ => s
-  }
-
-  def computeFieldsSummary(df: DataFrame, dim: Integer, fieldNames: Array[String]): Seq[FieldSummary] = {
-    val summary = df.summary("min", "max").collect
-    (1 to dim).map(col =>
-      FieldSummary(
-        fieldNames(col - 1),
-        removeDotZero(summary(0).getString(col)),
-        removeDotZero(summary(1).getString(col)))
-    )
-  }
-
-  def isInteger(s: String): Boolean = s match {
-    case integerRegex(_) => true
-    case _ => false
-  }
-
-  def isReal(s: String): Boolean = s match {
-    case realRegex(_) => true
-    case _ => false
-  }
-
-  def computeFieldType(summary: FieldSummary): (FieldSummary, Char) = {
-    summary match {
-      case FieldSummary(_, "0", "1") =>
-        (summary, 'B')
-      case FieldSummary(_, min, max) if isInteger(min) && isInteger(max) =>
-        (summary, 'I')
-      case FieldSummary(_, min, max) if isReal(min) || isReal(max) =>
-        (summary, 'R')
-      case _ =>
-        (summary, 'O')
-    }
   }
 
 }

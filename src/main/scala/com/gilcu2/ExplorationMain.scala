@@ -50,10 +50,14 @@ object ExplorationMain extends LazyLogging {
 
     val inputPath = configValues.dataDir + lineArguments.inputName
     val data = Spark.loadCSVFromFile(inputPath)
-    data.show
+    data.cache
+    val columnsToShow = data.columns.take(30)
+
+    println("First rows with some columns")
+    data.select("y", columnsToShow: _*).show(10)
 
     val dataSummary = Exploration.summarizeFields(data)
-    Exploration.printDataSummary(dataSummary)
+    Exploration.printDataSummary(dataSummary, inputPath)
 
   }
 
