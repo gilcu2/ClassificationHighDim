@@ -1,23 +1,12 @@
 package com.gilcu2
 
-import com.gilcu2.exploration.Exploration
 import com.gilcu2.interfaces._
 import com.typesafe.config.Config
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.rogach.scallop.ScallopConf
+import DataFrame._
 
 object PreProcessingMain extends MainTrait {
-
-  class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
-    val logCountsAndTimes = opt[Boolean]()
-    val inputName = trailArg[String]()
-    val removeNullColumns = opt[Boolean]()
-  }
-
-  case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String) extends LineArgumentValuesTrait
-
-  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
-
 
   def process(configValues0: ConfigValuesTrait, lineArguments0: LineArgumentValuesTrait)(
     implicit spark: SparkSession
@@ -26,17 +15,35 @@ object PreProcessingMain extends MainTrait {
     val configValues = configValues0.asInstanceOf[ConfigValues]
     val lineArguments = lineArguments0.asInstanceOf[CommandParameterValues]
 
-    val inputPath = configValues.dataDir + lineArguments.inputName
+    val inputPath = configValues.dataDir + lineArguments.inputName + ".csv"
+    val outputPath = configValues.dataDir + lineArguments.outputName + ".csv"
     val data = Spark.loadCSVFromFile(inputPath)
     data.cache
-    val columnsToShow = data.columns.take(30)
+    data.smartShow()
 
-    println("First rows with some columns")
-    data.select("y", columnsToShow: _*).show(10)
+    val cleaned = clean(data, lineArguments.removeNullColumns)
 
-    val dataSummary = Exploration.summarizeFields(data)
-    Exploration.printDataSummary(dataSummary, inputPath)
+    println("\nCleaned")
+    cleaned.smartShow()
 
+    val withFeaturedVector = cleaned.toFeatureVector
+    println("\nwithFeaturedVector")
+    withFeaturedVector.show
+
+    if (lineArguments.labeledPoints) {
+      val withLabeledPoints = withFeaturedVector.toLabeledPoints
+    }
+    else
+      withFeaturedVector.saveJson(outputPath)
+
+  }
+
+  def clean(df: DataFrame, removeNullColumns: Boolean): DataFrame = {
+
+    if (removeNullColumns)
+      df.rmColumnsWithNull
+    else
+      df
   }
 
   def getConfigValues(conf: Config): ConfigValuesTrait = {
@@ -52,8 +59,30 @@ object PreProcessingMain extends MainTrait {
 
     val logCountsAndTimes = parsedArgs.logCountsAndTimes()
     val inputName = parsedArgs.inputName()
+    val outputName = parsedArgs.outputName()
+    val removeNullColumns = parsedArgs.removeNullColumns()
+    val outputOneFile = parsedArgs.outputOneFile()
+    val labeledPoints = parsedArgs.labeledPoints()
 
-    CommandParameterValues(logCountsAndTimes, inputName)
+    CommandParameterValues(logCountsAndTimes, inputName, outputName, removeNullColumns, outputOneFile, labeledPoints)
   }
+
+  class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
+    val inputName = trailArg[String]()
+    val outputName = trailArg[String]()
+
+    val logCountsAndTimes = opt[Boolean]()
+    val outputOneFile = opt[Boolean]()
+    val labeledPoints = opt[Boolean]()
+
+    val removeNullColumns = opt[Boolean]()
+  }
+
+  case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String, outputName: String,
+                                    removeNullColumns: Boolean, outputOneFile: Boolean,
+                                    labeledPoints: Boolean
+                                   ) extends LineArgumentValuesTrait
+
+  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
 
 }

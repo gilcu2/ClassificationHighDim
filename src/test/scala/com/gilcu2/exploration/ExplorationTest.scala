@@ -1,7 +1,7 @@
 package com.gilcu2.exploration
 
 import com.gilcu2.interfaces.Spark._
-import org.apache.spark.sql.Row
+import com.gilcu2.interfaces.DataFrame._
 import org.scalatest._
 import testUtil.SparkSessionTestWrapper
 import testUtil.UtilTest._
@@ -20,10 +20,10 @@ class ExplorationTest extends FlatSpec with Matchers with GivenWhenThen with Spa
     val data = loadCSVFromFile("data/sample.csv")
 
     When("the is described")
-    val summary = Exploration.summarizeFields(data)
+    val summary = Exploration.summarize(data)
 
     Then(" the description must have the number of fields expected")
-    summary.size shouldBe 305
+    summary.columnNumber shouldBe 305
 
   }
 
@@ -54,7 +54,7 @@ class ExplorationTest extends FlatSpec with Matchers with GivenWhenThen with Spa
     val data = loadCSVFromLines(spark.createDataset(lines))
 
     When("the counting is done")
-    val count = Exploration.countRowsWithNullOrEmptyString(data)
+    val count = data.countRowsWithNullOrEmptyString
 
     Then("the columns with null must be A,B")
     count shouldBe 3L

@@ -5,19 +5,9 @@ import com.gilcu2.interfaces._
 import com.typesafe.config.Config
 import org.apache.spark.sql.SparkSession
 import org.rogach.scallop.ScallopConf
+import DataFrame._
 
 object ExplorationMain extends MainTrait {
-
-  class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
-    val logCountsAndTimes = opt[Boolean]()
-    val inputName = trailArg[String]()
-    val removeNullColumns = opt[Boolean]()
-  }
-
-  case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String) extends LineArgumentValuesTrait
-
-  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
-
 
   def process(configValues0: ConfigValuesTrait, lineArguments0: LineArgumentValuesTrait)(
     implicit spark: SparkSession
@@ -26,15 +16,13 @@ object ExplorationMain extends MainTrait {
     val configValues = configValues0.asInstanceOf[ConfigValues]
     val lineArguments = lineArguments0.asInstanceOf[CommandParameterValues]
 
-    val inputPath = configValues.dataDir + lineArguments.inputName
+    val inputPath = configValues.dataDir + lineArguments.inputName + ".csv"
     val data = Spark.loadCSVFromFile(inputPath)
     data.cache
-    val columnsToShow = data.columns.take(30)
 
-    println("First rows with some columns")
-    data.select("y", columnsToShow: _*).show(10)
+    data.smartShow
 
-    val dataSummary = Exploration.summarizeFields(data)
+    val dataSummary = Exploration.summarize(data)
     Exploration.printDataSummary(dataSummary, inputPath)
 
   }
@@ -55,5 +43,15 @@ object ExplorationMain extends MainTrait {
 
     CommandParameterValues(logCountsAndTimes, inputName)
   }
+
+  class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
+    val logCountsAndTimes = opt[Boolean]()
+    val inputName = trailArg[String]()
+
+  }
+
+  case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String) extends LineArgumentValuesTrait
+
+  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
 
 }

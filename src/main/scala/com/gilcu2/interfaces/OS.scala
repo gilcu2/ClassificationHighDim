@@ -1,6 +1,6 @@
 package com.gilcu2.interfaces
 
-object OperatingSystem {
+object OS {
 
   def getHostname: String = java.net.InetAddress.getLocalHost.getHostName
 

@@ -3,23 +3,24 @@ package com.gilcu2.exploration
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
-import com.gilcu2.interfaces.Spark._
+import com.gilcu2.interfaces.DataFrame._
 
-case class DataSummary(size: Long, dim: Int, fields: Seq[String],
+case class DataSummary(rowNumber: Long, columnNumber: Int, fields: Seq[String],
                        booleanFields: Seq[String], integerFields: Seq[String],
                        realFields: Seq[String], otherFields: Seq[String],
                        fieldsSummary: Seq[FieldSummary], classesSize: Seq[(Int, Long)],
-                       nullCountPerColumn: Seq[(String, Long)], nullRows: Long
+                       nullCountPerColumn: Seq[(String, Long)], nullRows: Long, totalZeros: Long
                       )
 
 case class FieldSummary(name: String, min: String, max: String)
 
 object Exploration extends LazyLogging {
+
   val dotCeroRegex = "([0-9]+).0".r
   val integerRegex = "^(-?[0-9]+)$".r
   val realRegex = "^(-?[0-9]+.[0-9]+)$".r
 
-  def summarizeFields(df: DataFrame): DataSummary = {
+  def summarize(df: DataFrame): DataSummary = {
 
     val size = df.count
     val fieldNames = df.columns
@@ -36,15 +37,58 @@ object Exploration extends LazyLogging {
     val classesSize = computeClassesSizes(df)
 
     val nullsPerColumn = df.countNullsPerColumn
-    val nullRows = countRowsWithNullOrEmptyString(df)
+    val nullRows = df.countRowsWithNullOrEmptyString
+
+    val totalZeros = df.countNumberOfZeros
 
     DataSummary(size, dim, fieldNames, booleanFields, integerFields, realFields, otherFields,
-      fieldsSummary, classesSize, nullsPerColumn, nullRows)
+      fieldsSummary, classesSize, nullsPerColumn, nullRows, totalZeros)
 
   }
 
+  def printDataSummary(dataSummary: DataSummary, inputPath: String): Unit = {
+
+    def printFieldTypes(fieldType: String, fields: Seq[String]): Unit =
+      println(s"Fields $fieldType: ${fields.size}\n ${fields}\n")
+
+    println("\nClassifier report\n")
+
+    println(s"Input: $inputPath\n")
+
+    println(s"Size: ${dataSummary.rowNumber}\n")
+    println(s"Fields: ${dataSummary.fields.size}\n ${dataSummary.fields}\n")
+
+    printFieldTypes("Boolean", dataSummary.booleanFields)
+    printFieldTypes("Integer", dataSummary.integerFields)
+    printFieldTypes("Real", dataSummary.realFields)
+    printFieldTypes("Other", dataSummary.otherFields)
+
+    println(s"\nRows with null: ${dataSummary.nullRows}")
+
+    val columnsWithNulls = dataSummary.nullCountPerColumn.filter(_._2 > 0)
+    val countColumnsWithNulls = columnsWithNulls.length
+    println(s"\nColumns with nulls: $countColumnsWithNulls}")
+    println("Nulls per column")
+    columnsWithNulls.foreach(pair => println(s"${pair._1}\t${pair._2}"))
+
+    val zerosFraction = dataSummary.totalZeros.toDouble / (dataSummary.rowNumber * dataSummary.columnNumber)
+    println(s"\nTotal number of zeros: ${dataSummary.totalZeros} ${zerosFraction}")
+
+    if (dataSummary.classesSize.nonEmpty) {
+      println(s"\nClasses: ${dataSummary.classesSize.size}")
+      dataSummary.classesSize.foreach(pair => println(s"${pair._1}\t${pair._2}"))
+    }
+
+    println("\nFields summary")
+    println("Name\tMin\tMax")
+    dataSummary.fieldsSummary.foreach(summary =>
+      println(s"${summary.name}\t${summary.min}\t${summary.max}")
+    )
+  }
+
+
   def computeClassesSizes(df: DataFrame): Seq[(Int, Long)] = {
-    if (df.existColumn("y")) {
+    if (df.hasColumn("y")) {
       val r = df.select("y")
         .groupBy("y")
         .agg(count("y"))
@@ -99,48 +143,6 @@ object Exploration extends LazyLogging {
   def isReal(s: String): Boolean = s match {
     case realRegex(_) => true
     case _ => false
-  }
-
-
-  def countRowsWithNullOrEmptyString(df: DataFrame): Long = {
-    val cond = df.columns.map(x => col(x).isNull || col(x) === "").reduce(_ || _)
-    df.filter(cond).count
-  }
-
-
-  def printDataSummary(dataSummary: DataSummary, inputPath: String): Unit = {
-
-    def printFieldTypes(fieldType: String, fields: Seq[String]): Unit =
-      println(s"Fields $fieldType: ${fields.size}\n ${fields}\n")
-
-    println("\nClassifier report\n")
-
-    println(s"Input: $inputPath\n")
-
-    println(s"Size: ${dataSummary.size}\n")
-    println(s"Fields: ${dataSummary.fields.size}\n ${dataSummary.fields}\n")
-
-    printFieldTypes("Boolean", dataSummary.booleanFields)
-    printFieldTypes("Integer", dataSummary.integerFields)
-    printFieldTypes("Real", dataSummary.realFields)
-    printFieldTypes("Other", dataSummary.otherFields)
-
-    if (dataSummary.classesSize.nonEmpty) {
-      println(s"Classes: ${dataSummary.classesSize.size}")
-      dataSummary.classesSize.foreach(pair => println(s"${pair._1}\t${pair._2}"))
-    }
-
-    println(s"\nRows with null: ${dataSummary.nullRows}")
-
-    println(s"Columns with nulls: ${dataSummary.nullCountPerColumn.count(_._2 > 0)}")
-    println("Nulls per column")
-    dataSummary.nullCountPerColumn.foreach(pair => println(s"${pair._1}\t${pair._2}"))
-
-    println("\nFields summary")
-    println("Name\tMin\tMax")
-    dataSummary.fieldsSummary.foreach(summary =>
-      println(s"${summary.name}\t${summary.min}\t${summary.max}")
-    )
   }
 
 }

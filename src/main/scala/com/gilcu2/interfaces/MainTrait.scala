@@ -26,21 +26,31 @@ trait MainTrait extends LazyLogging {
     logger.info(s"Begin: $beginTime")
     logger.info(s"Arguments: $args")
 
-    println(s"Begin: $beginTime")
-
     implicit val conf = ConfigFactory.load
     val sparkConf = new SparkConf().setAppName("Exploration")
     implicit val spark = Spark.sparkSession(sparkConf)
 
+    println(s"Begin: $beginTime Machine: ${OS.getHostname} Cores: ${Spark.getTotalCores}")
+
     val configValues = getConfigValues(conf)
     val lineArguments = getLineArgumentsValues(args, configValues)
 
-    process(configValues, lineArguments)
+    try {
+      process(configValues, lineArguments)
+    }
+    catch {
+      case e =>
+        val problem = s"Houston...: $e"
+        logger.error(problem)
+        println(problem)
+    }
+    finally {
 
-    val endTime = getCurrentTime
-    val humanTime = getHumanDuration(beginTime, endTime)
-    logger.info(s"End: $endTime Total: $humanTime")
-    println(s"End: $endTime Total: $humanTime")
+      val endTime = getCurrentTime
+      val humanTime = getHumanDuration(beginTime, endTime)
+      logger.info(s"End: $endTime Total: $humanTime")
+      println(s"End: $endTime Total: $humanTime")
+    }
 
   }
 
