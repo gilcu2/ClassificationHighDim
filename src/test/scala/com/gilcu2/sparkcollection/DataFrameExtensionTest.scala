@@ -1,12 +1,13 @@
-package com.gilcu2.interfaces
+package com.gilcu2.sparkcollection
 
 import com.gilcu2.interfaces.Spark.loadCSVFromLines
+import com.gilcu2.sparkcollection.DataFrameExtension._
 import org.scalatest.{FlatSpec, GivenWhenThen, Matchers}
 import testUtil.SparkSessionTestWrapper
-import com.gilcu2.sparkcollection.DataFrameExtension._
 import testUtil.UtilTest._
+import org.apache.spark.ml.linalg
 
-class DataFrameTest extends FlatSpec with Matchers with GivenWhenThen with SparkSessionTestWrapper {
+class DataFrameExtensionTest extends FlatSpec with Matchers with GivenWhenThen with SparkSessionTestWrapper {
 
   behavior of "DataFrame"
   implicit val spaekSession = spark
@@ -97,6 +98,28 @@ class DataFrameTest extends FlatSpec with Matchers with GivenWhenThen with Spark
 
   }
 
+  it should "scale the data set by features" in {
+
+    Given("the data with features")
+    val lines =
+      """
+        |A,B,C,y
+        |0,1,2,1
+        |3,0,4,2
+        |4,0,6,3,
+        |1,0,0,4
+      """.cleanLines
+    val data = loadCSVFromLines(spark.createDataset(lines))
+    val withFeatureVector = data.toFeatureVector
+
+    When("normalize")
+    val scaled = withFeatureVector.scaleFeatures
+
+    Then("features must be the expected")
+    scaled.head.getAs[linalg.Vector]("features")(2) shouldBe 2.0 / 6.0
+
+  }
+
   it should "convect to labeled point" in {
 
     Given("the data")
@@ -114,7 +137,7 @@ class DataFrameTest extends FlatSpec with Matchers with GivenWhenThen with Spark
     When("the data is transformed")
     val withLabeledPoint = withFeatureVector.toLabeledPoints
 
-      Then("the columns with null must be A,B")
+    Then("the columns with null must be A,B")
     withLabeledPoint.count shouldBe 4
 
   }

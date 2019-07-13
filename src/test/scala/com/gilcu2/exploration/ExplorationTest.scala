@@ -17,7 +17,7 @@ class ExplorationTest extends FlatSpec with Matchers with GivenWhenThen with Spa
   it should "summarize data" in {
 
     Given("the data")
-    val data = loadCSVFromFile("data/sample.csv")
+    val data = loadCSVFromFile("data/sample")
 
     When("the is described")
     val summary = Exploration.summarize(data)
@@ -30,7 +30,7 @@ class ExplorationTest extends FlatSpec with Matchers with GivenWhenThen with Spa
   it should "compute classes sizes" in {
 
     Given("the data")
-    val data = loadCSVFromFile("data/sample.csv")
+    val data = loadCSVFromFile("data/sample")
 
     When("the is described")
     val classesSize = Exploration.computeClassesSizes(data)

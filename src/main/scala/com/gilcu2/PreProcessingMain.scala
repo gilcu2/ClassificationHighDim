@@ -10,6 +10,13 @@ import com.gilcu2.sparkcollection.{Json, Svm}
 
 object PreProcessingMain extends MainTrait {
 
+  case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String, outputName: String,
+                                    removeNullColumns: Boolean, outputOneFile: Boolean,
+                                    labeledPoints: Boolean, scaledFeatures: Boolean
+                                   ) extends LineArgumentValuesTrait
+
+  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
+
   class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val inputName = trailArg[String]()
     val outputName = trailArg[String]()
@@ -19,6 +26,7 @@ object PreProcessingMain extends MainTrait {
     val labeledPoints = opt[Boolean](short = 'p')
 
     val removeNullColumns = opt[Boolean]()
+    val scaledFeatures = opt[Boolean]()
   }
 
   def process(configValues0: ConfigValuesTrait, lineArguments0: LineArgumentValuesTrait)(
@@ -35,12 +43,17 @@ object PreProcessingMain extends MainTrait {
     data.persist
     data.smartShow(inputPath)
 
-    val cleaned = data.transform((df: DataFrame) => if (lineArguments.removeNullColumns) df.rmColumnsWithNull else df)
+    val cleaned = data.transform((df: DataFrame) =>
+      if (lineArguments.removeNullColumns) df.rmColumnsWithNull else df
+    )
 
     val withFeaturedVector = cleaned.transform((df: DataFrame) => df.toFeatureVector)
 
+    val withTransformedFeatures = withFeaturedVector.transform((df: DataFrame) =>
+      if (lineArguments.scaledFeatures) df.scaleFeatures else df)
+
     if (lineArguments.labeledPoints) {
-      val withLabeledPoints = withFeaturedVector.transform((ds: DataFrame) => ds.toLabeledPoints)
+      val withLabeledPoints = withTransformedFeatures.transform((ds: DataFrame) => ds.toLabeledPoints)
 
       withLabeledPoints.save(outputPath, Svm)
     }
@@ -67,17 +80,10 @@ object PreProcessingMain extends MainTrait {
     val removeNullColumns = parsedArgs.removeNullColumns()
     val outputOneFile = parsedArgs.outputOneFile()
     val labeledPoints = parsedArgs.labeledPoints()
+    val scaledFeatures = parsedArgs.scaledFeatures()
 
-    CommandParameterValues(logCountsAndTimes, inputName, outputName, removeNullColumns, outputOneFile, labeledPoints)
+    CommandParameterValues(logCountsAndTimes, inputName, outputName, removeNullColumns, outputOneFile,
+      labeledPoints, scaledFeatures)
   }
-
-
-
-  case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String, outputName: String,
-                                    removeNullColumns: Boolean, outputOneFile: Boolean,
-                                    labeledPoints: Boolean
-                                   ) extends LineArgumentValuesTrait
-
-  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
 
 }

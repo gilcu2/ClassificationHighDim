@@ -1,6 +1,7 @@
 package com.gilcu2.sparkcollection
 
-import org.apache.spark.ml.feature.{LabeledPoint, VectorAssembler}
+import com.gilcu2.interfaces.Time
+import org.apache.spark.ml.feature.{LabeledPoint, MinMaxScaler, Normalizer, VectorAssembler}
 import org.apache.spark.ml.linalg
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions.{col, _}
@@ -10,6 +11,9 @@ case class LearnMatrix(features: DataFrame, labels: DataFrame)
 object DataFrameExtension {
 
   implicit class ExtendedDataFrame(df: DataFrame) {
+
+    val CLASS_FIELD = "y"
+    val FEATURES_FIELD = "features"
 
     def rmColumnsWithNull: DataFrame = {
       val (columnsWithoutNullCount, columnsWithNullCount) = df.countNullsPerColumn.partition(_._2 == 0)
@@ -51,24 +55,48 @@ object DataFrameExtension {
     }
 
     def toFeatureVector: DataFrame = {
+
+      println(s"toFeatureVector ${Time.getCurrentTime}")
+
       val columns = df.columns.toSet
       val hasClassColumn = columns.contains("y")
       val featureColumns = (columns - "y").toArray
       val assembler = new VectorAssembler()
         .setInputCols(featureColumns)
-        .setOutputCol("features")
+        .setOutputCol(FEATURES_FIELD)
 
       val withFeatures = assembler.transform(df)
       if (hasClassColumn)
-        withFeatures.select("y", "features")
+        withFeatures.select(CLASS_FIELD, FEATURES_FIELD)
       else
-        withFeatures.select("features")
+        withFeatures.select(FEATURES_FIELD)
     }
 
     def toLabeledPoints(implicit spark: SparkSession): Dataset[LabeledPoint] = {
+
+      println(s"toLabeledPoints ${Time.getCurrentTime}")
+
       import spark.implicits._
-      df.map(row => LabeledPoint(row.getAs[Int]("y").toDouble,
-        row.getAs[linalg.Vector]("features")))
+      df.map(row => LabeledPoint(row.getAs[Int](CLASS_FIELD).toDouble,
+        row.getAs[linalg.Vector](FEATURES_FIELD)))
+    }
+
+    def scaleFeatures(implicit spark: SparkSession): DataFrame = {
+
+      println(s"scaleFeatures ${Time.getCurrentTime}")
+
+      val tempField = "scaledFeatures"
+
+      val scaler = new MinMaxScaler()
+        .setInputCol(FEATURES_FIELD)
+        .setOutputCol(tempField)
+
+      val scalerModel = scaler.fit(df)
+      val withScaledFeatures = scalerModel.transform(df)
+      val renamedFields = withScaledFeatures
+        .withColumnRenamed(FEATURES_FIELD, "oldFeatures")
+        .withColumnRenamed(tempField, FEATURES_FIELD)
+      renamedFields.select(df.columns.head, df.columns.tail: _*)
     }
 
 
