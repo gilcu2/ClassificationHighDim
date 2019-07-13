@@ -2,9 +2,12 @@ package com.gilcu2.datasets
 
 import com.gilcu2.interfaces.HadoopFS.delete
 import com.gilcu2.interfaces.Time
-import org.apache.spark.sql.Dataset
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.ml.feature.LabeledPoint
+import DataFrameExtension.{CLASS_FIELD, FEATURES_FIELD}
+import org.apache.spark.ml.feature.{LabeledPoint, MinMaxScaler, Normalizer, VectorAssembler}
+import org.apache.spark.ml.linalg
+import org.apache.spark.sql._
 
 object DatasetExtension {
 
@@ -43,15 +46,5 @@ object DatasetExtension {
     }
 
   }
-
-  def toLabeledPoints(implicit spark: SparkSession): Dataset[LabeledPoint] = {
-
-    println(s"toLabeledPoints ${Time.getCurrentTime}")
-
-    import spark.implicits._
-    df.map(row => LabeledPoint(row.getAs[Int](CLASS_FIELD).toDouble,
-      row.getAs[linalg.Vector](FEATURES_FIELD)))
-  }
-
 
 }

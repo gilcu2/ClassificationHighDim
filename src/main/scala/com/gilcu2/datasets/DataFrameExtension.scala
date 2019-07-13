@@ -15,7 +15,6 @@ object DataFrameExtension {
 
   implicit class ExtendedDataFrame(df: DataFrame) {
 
-
     def rmColumnsWithNull: DataFrame = {
       val (columnsWithoutNullCount, columnsWithNullCount) = df.countNullsPerColumn.partition(_._2 == 0)
       val columnsWithNull = columnsWithNullCount.map(_._1)
@@ -95,6 +94,17 @@ object DataFrameExtension {
         .withColumnRenamed(tempField, FEATURES_FIELD)
       renamedFields.select(df.columns.head, df.columns.tail: _*)
     }
+
+    def toLabeledPoints(implicit spark: SparkSession): Dataset[LabeledPoint] = {
+
+      println(s"toLabeledPoints ${Time.getCurrentTime}")
+
+      import spark.implicits._
+      df.map { case row: Row =>
+        LabeledPoint(row.getAs[Int](CLASS_FIELD).toDouble, row.getAs[linalg.Vector](FEATURES_FIELD))
+      }
+    }
+
 
 
   }

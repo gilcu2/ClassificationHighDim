@@ -43,9 +43,15 @@ object PreProcessingMain extends MainTrait {
       Some(transformer)
     } else None
 
-    val pipeline = new Pipeline().setStages(Seq(removerColumnsWithNull, scaler,))
+    val pipeline = new Pipeline().setStages(
+      Seq(removerColumnsWithNull, scaler, vectorAssembler).filter(_.nonEmpty).map(_.get).toArray
+    )
 
-      withFeaturedVector.save(outputPath, Json)
+    val model = pipeline.fit(data)
+
+    val processed = model.transform(data)
+
+    processed.save(outputPath, Json)
 
 
   }
