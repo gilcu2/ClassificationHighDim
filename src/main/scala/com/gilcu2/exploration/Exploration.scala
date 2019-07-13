@@ -3,8 +3,8 @@ package com.gilcu2.exploration
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
-import com.gilcu2.sparkcollection.DataFrameExtension._
-import com.gilcu2.sparkcollection.DatasetExtension._
+import com.gilcu2.datasets.DataFrameExtension._
+import com.gilcu2.datasets.DatasetExtension._
 
 case class DataSummary(rowNumber: Long, columnNumber: Int, fields: Seq[String],
                        booleanFields: Seq[String], integerFields: Seq[String],

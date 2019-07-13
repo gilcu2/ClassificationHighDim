@@ -1,7 +1,7 @@
-package com.gilcu2.sparkcollection
+package com.gilcu2.datasets
 
 import com.gilcu2.interfaces.Spark.loadCSVFromLines
-import com.gilcu2.sparkcollection.DataFrameExtension._
+import com.gilcu2.datasets.DataFrameExtension._
 import org.scalatest.{FlatSpec, GivenWhenThen, Matchers}
 import testUtil.SparkSessionTestWrapper
 import testUtil.UtilTest._
@@ -10,8 +10,8 @@ import org.apache.spark.ml.linalg
 class DataFrameExtensionTest extends FlatSpec with Matchers with GivenWhenThen with SparkSessionTestWrapper {
 
   behavior of "DataFrame"
-  implicit val spaekSession = spark
 
+  implicit val spaekSession = spark
   import spark.implicits._
 
   it should "remove the columns with nulls" in {

@@ -4,30 +4,14 @@ import com.gilcu2.interfaces._
 import com.typesafe.config.Config
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.rogach.scallop.ScallopConf
-import com.gilcu2.sparkcollection.DataFrameExtension._
-import com.gilcu2.sparkcollection.DatasetExtension._
-import com.gilcu2.sparkcollection.{Json, Svm}
+import com.gilcu2.datasets.DataFrameExtension._
+import com.gilcu2.datasets.DatasetExtension._
+import com.gilcu2.datasets.{Json, Svm}
+import com.gilcu2.transformers.ColumnSelector
+import org.apache.spark.ml.Pipeline
+import org.apache.spark.ml.feature.{MinMaxScaler, VectorAssembler}
 
 object PreProcessingMain extends MainTrait {
-
-  case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String, outputName: String,
-                                    removeNullColumns: Boolean, outputOneFile: Boolean,
-                                    labeledPoints: Boolean, scaledFeatures: Boolean
-                                   ) extends LineArgumentValuesTrait
-
-  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
-
-  class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
-    val inputName = trailArg[String]()
-    val outputName = trailArg[String]()
-
-    val logCountsAndTimes = opt[Boolean]()
-    val outputOneFile = opt[Boolean]()
-    val labeledPoints = opt[Boolean](short = 'p')
-
-    val removeNullColumns = opt[Boolean]()
-    val scaledFeatures = opt[Boolean]()
-  }
 
   def process(configValues0: ConfigValuesTrait, lineArguments0: LineArgumentValuesTrait)(
     implicit spark: SparkSession
@@ -43,21 +27,24 @@ object PreProcessingMain extends MainTrait {
     data.persist
     data.smartShow(inputPath)
 
-    val cleaned = data.transform((df: DataFrame) =>
-      if (lineArguments.removeNullColumns) df.rmColumnsWithNull else df
-    )
+    val (removerColumnsWithNull, columns) = if (lineArguments.removeNullColumns) {
+      val notNullColumns = data.countNullsPerColumn.filter(_._2 == 0).map(_._1).toArray
+      val transformer = new ColumnSelector
+      transformer.setOutputColumns(notNullColumns)
+      (Some(transformer), notNullColumns)
+    } else (None, data.columns)
 
-    val withFeaturedVector = cleaned.transform((df: DataFrame) => df.toFeatureVector)
+    val scaler = if (lineArguments.scaledFeatures) Some(new MinMaxScaler) else None
 
-    val withTransformedFeatures = withFeaturedVector.transform((df: DataFrame) =>
-      if (lineArguments.scaledFeatures) df.scaleFeatures else df)
+    val vectorAssembler = if (lineArguments.vectorAssembling) {
+      val transformer = new VectorAssembler
+      val featureColumns = (columns.toSet - CLASS_FIELD).toArray
+      transformer.setInputCols(featureColumns).setOutputCol(FEATURES_FIELD)
+      Some(transformer)
+    } else None
 
-    if (lineArguments.labeledPoints) {
-      val withLabeledPoints = withTransformedFeatures.transform((ds: DataFrame) => ds.toLabeledPoints)
+    val pipeline = new Pipeline().setStages(Seq(removerColumnsWithNull, scaler,))
 
-      withLabeledPoints.save(outputPath, Svm)
-    }
-    else
       withFeaturedVector.save(outputPath, Json)
 
 
@@ -79,11 +66,30 @@ object PreProcessingMain extends MainTrait {
     val outputName = parsedArgs.outputName()
     val removeNullColumns = parsedArgs.removeNullColumns()
     val outputOneFile = parsedArgs.outputOneFile()
-    val labeledPoints = parsedArgs.labeledPoints()
-    val scaledFeatures = parsedArgs.scaledFeatures()
+    val labeledPoints = parsedArgs.vectorAssembling()
+    val vectorAssembling = parsedArgs.scaledFeatures()
 
     CommandParameterValues(logCountsAndTimes, inputName, outputName, removeNullColumns, outputOneFile,
-      labeledPoints, scaledFeatures)
+      labeledPoints, vectorAssembling)
+  }
+
+  case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String, outputName: String,
+                                    removeNullColumns: Boolean, outputOneFile: Boolean,
+                                    vectorAssembling: Boolean, scaledFeatures: Boolean
+                                   ) extends LineArgumentValuesTrait
+
+  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
+
+  class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
+    val inputName = trailArg[String]()
+    val outputName = trailArg[String]()
+
+    val logCountsAndTimes = opt[Boolean]()
+    val outputOneFile = opt[Boolean]()
+
+    val removeNullColumns = opt[Boolean]()
+    val scaledFeatures = opt[Boolean]()
+    val vectorAssembling = opt[Boolean]()
   }
 
 }

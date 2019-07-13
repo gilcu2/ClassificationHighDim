@@ -5,7 +5,7 @@ import com.gilcu2.interfaces._
 import com.typesafe.config.Config
 import org.apache.spark.sql.SparkSession
 import org.rogach.scallop.ScallopConf
-import com.gilcu2.sparkcollection.DatasetExtension._
+import com.gilcu2.datasets.DatasetExtension._
 
 object ExplorationMain extends MainTrait {
 

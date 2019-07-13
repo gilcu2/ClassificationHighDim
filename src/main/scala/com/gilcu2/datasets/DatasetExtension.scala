@@ -1,21 +1,16 @@
-package com.gilcu2.sparkcollection
+package com.gilcu2.datasets
 
 import com.gilcu2.interfaces.HadoopFS.delete
+import com.gilcu2.interfaces.Time
 import org.apache.spark.sql.Dataset
-
-sealed case class Format(code: String)
-
-object Csv extends Format("csv")
-
-object Json extends Format("json")
-
-object Svm extends Format("libsvm")
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.ml.feature.LabeledPoint
 
 object DatasetExtension {
 
   implicit class ExtendedDataset[T](ds: Dataset[T]) {
 
-    def save(path: String, format: Format): Unit = {
+    def save(path: String, format: FileFormat): Unit = {
 
       val pathWithExt = s"$path.${format.code}"
 
@@ -47,6 +42,15 @@ object DatasetExtension {
       ds
     }
 
+  }
+
+  def toLabeledPoints(implicit spark: SparkSession): Dataset[LabeledPoint] = {
+
+    println(s"toLabeledPoints ${Time.getCurrentTime}")
+
+    import spark.implicits._
+    df.map(row => LabeledPoint(row.getAs[Int](CLASS_FIELD).toDouble,
+      row.getAs[linalg.Vector](FEATURES_FIELD)))
   }
 
 

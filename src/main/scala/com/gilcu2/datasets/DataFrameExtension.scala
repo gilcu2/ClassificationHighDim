@@ -1,4 +1,4 @@
-package com.gilcu2.sparkcollection
+package com.gilcu2.datasets
 
 import com.gilcu2.interfaces.Time
 import org.apache.spark.ml.feature.{LabeledPoint, MinMaxScaler, Normalizer, VectorAssembler}
@@ -10,10 +10,11 @@ case class LearnMatrix(features: DataFrame, labels: DataFrame)
 
 object DataFrameExtension {
 
+  val CLASS_FIELD = "y"
+  val FEATURES_FIELD = "features"
+
   implicit class ExtendedDataFrame(df: DataFrame) {
 
-    val CLASS_FIELD = "y"
-    val FEATURES_FIELD = "features"
 
     def rmColumnsWithNull: DataFrame = {
       val (columnsWithoutNullCount, columnsWithNullCount) = df.countNullsPerColumn.partition(_._2 == 0)
@@ -58,9 +59,8 @@ object DataFrameExtension {
 
       println(s"toFeatureVector ${Time.getCurrentTime}")
 
-      val columns = df.columns.toSet
-      val hasClassColumn = columns.contains("y")
-      val featureColumns = (columns - "y").toArray
+      val (columns, featureColumns) = getFeaturedColumns
+      val hasClassColumn = columns.contains(CLASS_FIELD)
       val assembler = new VectorAssembler()
         .setInputCols(featureColumns)
         .setOutputCol(FEATURES_FIELD)
@@ -72,13 +72,10 @@ object DataFrameExtension {
         withFeatures.select(FEATURES_FIELD)
     }
 
-    def toLabeledPoints(implicit spark: SparkSession): Dataset[LabeledPoint] = {
-
-      println(s"toLabeledPoints ${Time.getCurrentTime}")
-
-      import spark.implicits._
-      df.map(row => LabeledPoint(row.getAs[Int](CLASS_FIELD).toDouble,
-        row.getAs[linalg.Vector](FEATURES_FIELD)))
+    def getFeaturedColumns: (Set[String], Array[String]) = {
+      val columns = df.columns.toSet
+      val featureColumns = (columns - CLASS_FIELD).toArray
+      (columns, featureColumns)
     }
 
     def scaleFeatures(implicit spark: SparkSession): DataFrame = {
