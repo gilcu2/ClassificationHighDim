@@ -39,7 +39,7 @@ trait MainTrait extends LazyLogging {
       process(configValues, lineArguments)
     }
     catch {
-      case e =>
+      case e: Throwable =>
         val problem = s"Houston...: $e"
         logger.error(problem)
         println(problem)

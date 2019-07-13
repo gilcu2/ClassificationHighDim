@@ -3,14 +3,17 @@ package com.gilcu2.exploration
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
-import com.gilcu2.interfaces.DataFrame._
+import com.gilcu2.sparkcollection.DataFrameExtension._
+import com.gilcu2.sparkcollection.DatasetExtension._
 
 case class DataSummary(rowNumber: Long, columnNumber: Int, fields: Seq[String],
                        booleanFields: Seq[String], integerFields: Seq[String],
                        realFields: Seq[String], otherFields: Seq[String],
                        fieldsSummary: Seq[FieldSummary], classesSize: Seq[(Int, Long)],
                        nullCountPerColumn: Seq[(String, Long)], nullRows: Long, totalZeros: Long
-                      )
+                      ) {
+  def print(label: String): Unit = Exploration.printDataSummary(this, label)
+}
 
 case class FieldSummary(name: String, min: String, max: String)
 
@@ -46,17 +49,17 @@ object Exploration extends LazyLogging {
 
   }
 
-  def printDataSummary(dataSummary: DataSummary, inputPath: String): Unit = {
+  def printDataSummary(dataSummary: DataSummary, label: String): Unit = {
 
     def printFieldTypes(fieldType: String, fields: Seq[String]): Unit =
       println(s"Fields $fieldType: ${fields.size}\n ${fields}\n")
 
-    println("\nClassifier report\n")
+    println("\nData summary\n")
 
-    println(s"Input: $inputPath\n")
+    println(s"Data: $label\n")
 
-    println(s"Size: ${dataSummary.rowNumber}\n")
-    println(s"Fields: ${dataSummary.fields.size}\n ${dataSummary.fields}\n")
+    println(s"Number of rows: ${dataSummary.rowNumber}\n")
+    println(s"Number of columns: ${dataSummary.fields.size}\n ${dataSummary.fields}\n")
 
     printFieldTypes("Boolean", dataSummary.booleanFields)
     printFieldTypes("Integer", dataSummary.integerFields)
@@ -75,7 +78,8 @@ object Exploration extends LazyLogging {
     println(s"\nTotal number of zeros: ${dataSummary.totalZeros} ${zerosFraction}")
 
     if (dataSummary.classesSize.nonEmpty) {
-      println(s"\nClasses: ${dataSummary.classesSize.size}")
+      println(s"\nNumber ofClasses: ${dataSummary.classesSize.size}")
+      println(s"Class\tSize")
       dataSummary.classesSize.foreach(pair => println(s"${pair._1}\t${pair._2}"))
     }
 

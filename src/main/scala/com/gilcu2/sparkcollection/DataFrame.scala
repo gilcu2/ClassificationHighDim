@@ -1,14 +1,13 @@
-package com.gilcu2.interfaces
+package com.gilcu2.sparkcollection
 
-import com.gilcu2.interfaces.HadoopFS.delete
 import org.apache.spark.ml.feature.{LabeledPoint, VectorAssembler}
-import org.apache.spark.sql._
-import org.apache.spark.sql.functions._
 import org.apache.spark.ml.linalg
+import org.apache.spark.sql._
+import org.apache.spark.sql.functions.{col, _}
 
 case class LearnMatrix(features: DataFrame, labels: DataFrame)
 
-object DataFrame {
+object DataFrameExtension {
 
   implicit class ExtendedDataFrame(df: DataFrame) {
 
@@ -36,45 +35,6 @@ object DataFrame {
       )
         .sortBy(_._2)
         .reverse
-    }
-
-    def smartShow(): Unit = {
-      println("\nFirst rows with some columns")
-      val columnsToShow = df.columns.take(20)
-      val dataToShow = if (df.hasColumn("y"))
-        df.select("y", columnsToShow: _*)
-      else
-        df.select(columnsToShow.head, columnsToShow.tail: _*)
-
-      dataToShow.show(10, 10)
-    }
-
-    def hasColumn(name: String): Boolean = df.columns.contains(name)
-
-    def saveCsv(path: String, oneFile: Boolean = false)(implicit sparkSession: SparkSession): Unit = {
-
-      delete(path)
-
-      val dfToSave = if (oneFile) df.coalesce(1) else df
-
-      df.write
-        .option("header", true)
-        .csv(path)
-
-    }
-
-    def saveJson(path: String, oneFile: Boolean = false)(implicit sparkSession: SparkSession): Unit = {
-
-      delete(path)
-
-      val dfToSave = if (oneFile) df.coalesce(1) else df
-
-      df.write
-        .option("header", true)
-        .json(path)
-
-      println(s"json $path saved")
-
     }
 
     def countRowsWithNullOrEmptyString: Long = {

@@ -3,7 +3,7 @@ package com.gilcu2.interfaces
 import com.gilcu2.interfaces.Spark.loadCSVFromLines
 import org.scalatest.{FlatSpec, GivenWhenThen, Matchers}
 import testUtil.SparkSessionTestWrapper
-import DataFrame._
+import com.gilcu2.sparkcollection.DataFrameExtension._
 import testUtil.UtilTest._
 
 class DataFrameTest extends FlatSpec with Matchers with GivenWhenThen with SparkSessionTestWrapper {

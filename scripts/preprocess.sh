@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+MASTER="local[8]"
 CONFIGPATH="."
 PROGRAM="../target/scala-2.11/classifier.jar"
 MAIN=com.gilcu2.PreProcessingMain
@@ -11,6 +12,7 @@ fi
 
 spark-submit \
 --class $MAIN \
+--master $MASTER \
 --conf "spark.driver.extraClassPath=$CONFIGPATH" \
 $PROGRAM $* 2>$ERROUT |tee $OUT
 

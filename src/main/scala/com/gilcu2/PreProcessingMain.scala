@@ -4,8 +4,9 @@ import com.gilcu2.interfaces._
 import com.typesafe.config.Config
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.rogach.scallop.ScallopConf
-import DataFrame._
-import Dataset._
+import com.gilcu2.sparkcollection.DataFrameExtension._
+import com.gilcu2.sparkcollection.DatasetExtension._
+import com.gilcu2.sparkcollection.{Json, Svm}
 
 object PreProcessingMain extends MainTrait {
 
@@ -27,39 +28,26 @@ object PreProcessingMain extends MainTrait {
     val configValues = configValues0.asInstanceOf[ConfigValues]
     val lineArguments = lineArguments0.asInstanceOf[CommandParameterValues]
 
-    val inputPath = configValues.dataDir + lineArguments.inputName + ".csv"
+    val inputPath = configValues.dataDir + lineArguments.inputName
+    val outputPath = configValues.dataDir + lineArguments.outputName
 
     val data = Spark.loadCSVFromFile(inputPath)
-    data.cache
-    data.smartShow()
+    data.persist
+    data.smartShow(inputPath)
 
-    val cleaned = clean(data, lineArguments.removeNullColumns)
+    val cleaned = data.transform((df: DataFrame) => if (lineArguments.removeNullColumns) df.rmColumnsWithNull else df)
 
-    println("\nCleaned")
-    cleaned.smartShow()
-
-    val withFeaturedVector = cleaned.toFeatureVector
-    println("\nwithFeaturedVector")
-    withFeaturedVector.show
+    val withFeaturedVector = cleaned.transform((df: DataFrame) => df.toFeatureVector)
 
     if (lineArguments.labeledPoints) {
-      val withLabeledPoints = withFeaturedVector.toLabeledPoints
-      val outputPath = configValues.dataDir + lineArguments.outputName + ".svm"
-      withLabeledPoints.saveSVM(outputPath)
+      val withLabeledPoints = withFeaturedVector.transform((ds: DataFrame) => ds.toLabeledPoints)
+
+      withLabeledPoints.save(outputPath, Svm)
     }
-    else {
-      val outputPath = configValues.dataDir + lineArguments.outputName + ".json"
-      withFeaturedVector.saveJson(outputPath)
-    }
-
-  }
-
-  def clean(df: DataFrame, removeNullColumns: Boolean): DataFrame = {
-
-    if (removeNullColumns)
-      df.rmColumnsWithNull
     else
-      df
+      withFeaturedVector.save(outputPath, Json)
+
+
   }
 
   def getConfigValues(conf: Config): ConfigValuesTrait = {

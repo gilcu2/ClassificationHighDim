@@ -5,7 +5,7 @@ import com.gilcu2.interfaces._
 import com.typesafe.config.Config
 import org.apache.spark.sql.SparkSession
 import org.rogach.scallop.ScallopConf
-import DataFrame._
+import com.gilcu2.sparkcollection.DatasetExtension._
 
 object ExplorationMain extends MainTrait {
 
@@ -16,14 +16,14 @@ object ExplorationMain extends MainTrait {
     val configValues = configValues0.asInstanceOf[ConfigValues]
     val lineArguments = lineArguments0.asInstanceOf[CommandParameterValues]
 
-    val inputPath = configValues.dataDir + lineArguments.inputName + ".csv"
+    val inputPath = configValues.dataDir + lineArguments.inputName
     val data = Spark.loadCSVFromFile(inputPath)
     data.cache
 
-    data.smartShow
+    data.smartShow("input data")
 
     val dataSummary = Exploration.summarize(data)
-    Exploration.printDataSummary(dataSummary, inputPath)
+    dataSummary.print(inputPath)
 
   }
 

@@ -12,7 +12,7 @@ object Spark {
       .getOrCreate()
 
   def loadCSVFromFile(path: String, delimiter: String = ",", header: Boolean = true)(implicit sparkSession: SparkSession): DataFrame = {
-    val lines = readTextFile(path)
+    val lines = readTextFile(path + ".csv")
     loadCSVFromLines(lines)
   }
 
@@ -29,9 +29,10 @@ object Spark {
   }
 
   def getTotalCores(implicit spark: SparkSession): Int = {
-    val workers = spark.sparkContext.statusTracker.getExecutorInfos.size
-    val cores = spark.sparkContext.getConf.get("spark.executor.cores", "1").toInt
-    workers * cores
+    val executors = spark.sparkContext.statusTracker.getExecutorInfos
+    val nExecutors = executors.size
+    val nCores = spark.sparkContext.defaultParallelism
+    nExecutors * nCores
   }
 
 }

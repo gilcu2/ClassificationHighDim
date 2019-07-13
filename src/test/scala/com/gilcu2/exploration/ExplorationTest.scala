@@ -1,7 +1,7 @@
 package com.gilcu2.exploration
 
 import com.gilcu2.interfaces.Spark._
-import com.gilcu2.interfaces.DataFrame._
+import com.gilcu2.sparkcollection.DataFrameExtension._
 import org.scalatest._
 import testUtil.SparkSessionTestWrapper
 import testUtil.UtilTest._
