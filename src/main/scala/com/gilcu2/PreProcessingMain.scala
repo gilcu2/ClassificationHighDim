@@ -7,11 +7,32 @@ import org.rogach.scallop.ScallopConf
 import com.gilcu2.datasets.DataFrameExtension._
 import com.gilcu2.datasets.DatasetExtension._
 import com.gilcu2.datasets.{Json, Svm}
-import com.gilcu2.transformers.ColumnSelector
+import com.gilcu2.transformers.{ColumnMapper, ColumnSelector}
 import org.apache.spark.ml.Pipeline
 import org.apache.spark.ml.feature.{MinMaxScaler, VectorAssembler}
 
 object PreProcessingMain extends MainTrait {
+
+  case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String, outputName: String,
+                                    removeNullColumns: Boolean, outputOneFile: Boolean,
+                                    vectorAssembling: Boolean, scaledFeatures: Boolean
+                                   ) extends LineArgumentValuesTrait
+
+  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
+
+  class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
+    val inputName = trailArg[String]()
+    val outputName = trailArg[String]()
+
+    val logCountsAndTimes = opt[Boolean]()
+    val outputOneFile = opt[Boolean]()
+
+    val removeNullColumns = opt[Boolean]()
+    val vectorAssembling = opt[Boolean]()
+    val scaledFeatures = opt[Boolean]()
+
+  }
+
 
   def process(configValues0: ConfigValuesTrait, lineArguments0: LineArgumentValuesTrait)(
     implicit spark: SparkSession
@@ -34,7 +55,6 @@ object PreProcessingMain extends MainTrait {
       (Some(transformer), notNullColumns)
     } else (None, data.columns)
 
-    val scaler = if (lineArguments.scaledFeatures) Some(new MinMaxScaler) else None
 
     val vectorAssembler = if (lineArguments.vectorAssembling) {
       val transformer = new VectorAssembler
@@ -43,9 +63,21 @@ object PreProcessingMain extends MainTrait {
       Some(transformer)
     } else None
 
-    val pipeline = new Pipeline().setStages(
-      Seq(removerColumnsWithNull, scaler, vectorAssembler).filter(_.nonEmpty).map(_.get).toArray
-    )
+    val (scaler, mapper) = if (lineArguments.scaledFeatures) {
+      val tempColumn = FEATURES_FIELD + "Scaled"
+
+      val scaler = new MinMaxScaler
+      scaler.setInputCol(FEATURES_FIELD)
+      scaler.setOutputCol(tempColumn)
+
+      val mapper = new ColumnMapper
+      mapper.setColumnMapping(Map(FEATURES_FIELD -> None, tempColumn -> Some(FEATURES_FIELD)))
+
+      (Some(scaler), Some(mapper))
+    } else (None, None)
+
+    val stages = Array(removerColumnsWithNull, vectorAssembler, scaler, mapper).filter(_.nonEmpty).map(_.get)
+    val pipeline = new Pipeline().setStages(stages)
 
     val model = pipeline.fit(data)
 
@@ -79,23 +111,5 @@ object PreProcessingMain extends MainTrait {
       labeledPoints, vectorAssembling)
   }
 
-  case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String, outputName: String,
-                                    removeNullColumns: Boolean, outputOneFile: Boolean,
-                                    vectorAssembling: Boolean, scaledFeatures: Boolean
-                                   ) extends LineArgumentValuesTrait
-
-  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
-
-  class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
-    val inputName = trailArg[String]()
-    val outputName = trailArg[String]()
-
-    val logCountsAndTimes = opt[Boolean]()
-    val outputOneFile = opt[Boolean]()
-
-    val removeNullColumns = opt[Boolean]()
-    val scaledFeatures = opt[Boolean]()
-    val vectorAssembling = opt[Boolean]()
-  }
 
 }
