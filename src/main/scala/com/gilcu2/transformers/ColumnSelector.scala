@@ -16,8 +16,14 @@ class ColumnSelector(override val uid: String = "ColumnSelector") extends Transf
   final def setOutputColumns(value: Array[String]): ColumnSelector = set(outputColumns, value)
 
   override def transform(dataset: Dataset[_]): DataFrame = {
+    println(s"Columns selectors beginning: ${dataset.columns.mkString(",")}")
+
     val columns = $(outputColumns)
-    dataset.select(columns.head, columns.tail: _*)
+    val r = dataset.select(columns.head, columns.tail: _*)
+
+    println(s"Columns selectors done: ${dataset.columns.mkString(",")}}")
+
+    r
   }
 
   override def transformSchema(schema: StructType): StructType = {
