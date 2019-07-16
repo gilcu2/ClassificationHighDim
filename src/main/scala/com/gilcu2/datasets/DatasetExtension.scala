@@ -132,11 +132,10 @@ object DatasetExtension {
 
       import spark.implicits._
       ds.map { case row: Row =>
-        LabeledPoint(row.getAs[Int](CLASS_FIELD).toDouble, row.getAs[linalg.Vector](FEATURES_FIELD))
+        LabeledPoint(row.getAs[Int](CLASS_FIELD).toDouble,
+          row.getAs[linalg.Vector](FEATURES_FIELD).compressed)
       }
     }
-
-
 
   }
 

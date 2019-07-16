@@ -1,7 +1,7 @@
 package com.gilcu2
 
 import com.gilcu2.datasets.DatasetExtension._
-import com.gilcu2.datasets.Json
+import com.gilcu2.datasets.{Json, Svm}
 import com.gilcu2.estimators.{NullColumnsRemover, VectorAssemblerEstimator}
 import com.gilcu2.interfaces._
 import com.gilcu2.transformers.{ColumnMapper, ColumnSelector}
@@ -31,20 +31,22 @@ object PreProcessingMain extends MainTrait {
 
     val withVectors = toVectors(lineArguments, data)
 
-    val scaled = if (lineArguments.scaledFeatures) scaleVector(data, withVectors) else withVectors
+    val scaled = if (lineArguments.scaledFeatures) scaleVector(withVectors) else withVectors
 
-    scaled.save(outputPath, Json)
+    val withLabeledPoint = scaled.toLabeledPoints
+
+    withLabeledPoint.save(outputPath, Svm)
 
   }
 
-  private def scaleVector(data: DataFrame, withVectors: DataFrame) = {
+  private def scaleVector(withVectors: DataFrame) = {
     val (scaler, afterScalerMapper) = makeScalerStage
 
     val pipeline = new Pipeline().setStages(Array(scaler, afterScalerMapper))
 
     val model = pipeline.fit(withVectors)
 
-    val processed = model.transform(data)
+    val processed = model.transform(withVectors)
     processed
   }
 

@@ -7,9 +7,9 @@ import org.scalatest.{FlatSpec, GivenWhenThen, Matchers}
 import testUtil.SparkSessionTestWrapper
 import testUtil.UtilTest._
 
-class DataFrameExtensionTest extends FlatSpec with Matchers with GivenWhenThen with SparkSessionTestWrapper {
+class DatasetExtensionTest extends FlatSpec with Matchers with GivenWhenThen with SparkSessionTestWrapper {
 
-  behavior of "DataFrame"
+  behavior of "Dataset"
 
   implicit val spaekSession = spark
   import spark.implicits._

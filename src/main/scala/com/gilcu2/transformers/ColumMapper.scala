@@ -22,8 +22,8 @@ class ColumnMapper(override val uid: String = Identifiable.randomUID("ColumnMapp
     println(s"Columns maping begin: ${ds.columns.mkString(",")}")
     val mapping = $(columnMapping)
 
-    val toDelete = mapping.filter(_._2.nonEmpty).map(_._1).toSet
-    val toKeep = ds.columns.filter(toDelete.contains)
+    val toDelete = mapping.filter(_._2.isEmpty).map(_._1).toSet
+    val toKeep = ds.columns.filter(!toDelete.contains(_))
     val removedColumnsDS = ds.select(toKeep.head, toKeep.tail: _*)
 
     val toRenameMap = mapping.filter(_._2.nonEmpty).map(p => (p._1, p._2.get))
