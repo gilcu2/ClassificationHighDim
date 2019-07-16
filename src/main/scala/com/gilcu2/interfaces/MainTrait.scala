@@ -40,12 +40,11 @@ trait MainTrait extends LazyLogging {
     }
     catch {
       case e: Throwable =>
-        val problem = s"Houston...: $e"
-        logger.error(problem)
-        println(problem)
+        logger.error(e.toString)
+        println(e)
+        e.getStackTrace.foreach(println)
     }
     finally {
-
       val endTime = getCurrentTime
       val humanTime = getHumanDuration(beginTime, endTime)
       logger.info(s"End: $endTime Total: $humanTime")

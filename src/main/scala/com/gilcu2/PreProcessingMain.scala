@@ -2,7 +2,7 @@ package com.gilcu2
 
 import com.gilcu2.datasets.DatasetExtension._
 import com.gilcu2.datasets.Json
-import com.gilcu2.estimators.NullColumnsRemover
+import com.gilcu2.estimators.{NullColumnsRemover, VectorAssemblerEstimator}
 import com.gilcu2.interfaces._
 import com.gilcu2.transformers.{ColumnMapper, ColumnSelector}
 import com.typesafe.config.Config
@@ -29,26 +29,44 @@ object PreProcessingMain extends MainTrait {
     data.persist
     data.smartShow(inputPath)
 
-    val nullColumnsRemover = makeNullColumnsRemoverStage(lineArguments.removeNullColumns)
-    val (vectorAssembler, selectorAferAssembler) = makeVectorAssemblerStage(lineArguments)
-    val (scaler, afterScalerMapper) = makeScalerStage(lineArguments.vectorAssembling,
-      lineArguments.scaledFeatures)
+    val withVectors = toVectors(lineArguments, data)
 
-    val stages = Array(removerColumnsWithNull, vectorAssembler, selectorAferAssembler, scaler,
-      afterScalerMapper).filter(_.nonEmpty).map(_.get)
+    val scaled = if (lineArguments.scaledFeatures) scaleVector(data, withVectors) else withVectors
+
+    scaled.save(outputPath, Json)
+
+  }
+
+  private def scaleVector(data: DataFrame, withVectors: DataFrame) = {
+    val (scaler, afterScalerMapper) = makeScalerStage
+
+    val pipeline = new Pipeline().setStages(Array(scaler, afterScalerMapper))
+
+    val model = pipeline.fit(withVectors)
+
+    val processed = model.transform(data)
+    processed
+  }
+
+  def toVectors(lineArguments: CommandParameterValues, data: DataFrame): DataFrame = {
+    val nullColumnsRemover = makeNullColumnsRemoverStage(lineArguments.removeNullColumns)
+    val vectorAssembler = makeVectorAssemblerStage
+
+    val stages = Array(nullColumnsRemover, vectorAssembler).filter(_.nonEmpty).map(_.get)
     val pipeline = new Pipeline().setStages(stages)
 
     val model = pipeline.fit(data)
 
     val processed = model.transform(data)
-
-    processed.save(outputPath, Json)
-
-
+    processed
   }
 
-  def makeScalerStage(vectorAssembling: Boolean, scaling: Boolean): (Option[MinMaxScaler], Option[ColumnMapper]) =
-    if (vectorAssembling && scaling) {
+  def makeVectorAssemblerStage: Option[VectorAssemblerEstimator] = Some(new VectorAssemblerEstimator)
+
+  def makeNullColumnsRemoverStage(removeNullColumns: Boolean): (Option[NullColumnsRemover]) =
+    if (removeNullColumns) Some(new NullColumnsRemover()) else None
+
+  def makeScalerStage: (MinMaxScaler, ColumnMapper) = {
       val tempColumn = FEATURES_FIELD + "Scaled"
 
       val scaler = new MinMaxScaler
@@ -58,27 +76,8 @@ object PreProcessingMain extends MainTrait {
       val mapper = new ColumnMapper
       mapper.setColumnMapping(Map(FEATURES_FIELD -> None, tempColumn -> Some(FEATURES_FIELD)))
 
-      (Some(scaler), Some(mapper))
-    } else (None, None)
-
-  def makeVectorAssemblerStage(vectorAssembling: Boolean)
-  : (Option[VectorAssembler], Option[ColumnSelector]) =
-    if (vectorAssembling) {
-      val vectorAssembler = new VectorAssembler
-      val featureColumns = (columns.toSet - CLASS_FIELD).toArray
-      vectorAssembler.setInputCols(featureColumns).setOutputCol(FEATURES_FIELD)
-
-      val selecter = new ColumnSelector
-      val desiredColumns = Array(CLASS_FIELD, FEATURES_FIELD)
-      selecter.setOutputColumns(desiredColumns)
-
-      (Some(vectorAssembler), Some(selecter))
-    } else (None, None)
-
-
-  def makeNullColumnsRemoverStage(removeNullColumns: Boolean)
-  : (Option[NullColumnsRemover]) =
-    if (removeNullColumns) Some(new NullColumnsRemover()) else None
+    (scaler, mapper)
+  }
 
   def getConfigValues(conf: Config): ConfigValuesTrait = {
     val dataDir = conf.getString("DataDir")
@@ -94,34 +93,35 @@ object PreProcessingMain extends MainTrait {
     val logCountsAndTimes = parsedArgs.logCountsAndTimes()
     val inputName = parsedArgs.inputName()
     val outputName = parsedArgs.outputName()
-    val removeNullColumns = parsedArgs.removeNullColumns()
-    val outputOneFile = parsedArgs.outputOneFile()
-    val labeledPoints = parsedArgs.vectorAssembling()
-    val vectorAssembling = parsedArgs.scaledFeatures()
 
-    CommandParameterValues(logCountsAndTimes, inputName, outputName, removeNullColumns, outputOneFile,
-      labeledPoints, vectorAssembling)
+    val removeNullColumns = parsedArgs.removeNullColumns()
+    val scaledFeatures = parsedArgs.scaledFeatures()
+    val outputOneFile = parsedArgs.outputOneFile()
+
+
+    CommandParameterValues(logCountsAndTimes, inputName, outputName, removeNullColumns, scaledFeatures,
+      outputOneFile)
+  }
+
+  case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String, outputName: String,
+                                    removeNullColumns: Boolean, scaledFeatures: Boolean,
+                                    outputOneFile: Boolean
+                                   ) extends LineArgumentValuesTrait
+
+  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
+
+  class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
+    val inputName = trailArg[String]()
+    val outputName = trailArg[String]()
+
+    val logCountsAndTimes = opt[Boolean]()
+    val outputOneFile = opt[Boolean]()
+
+    val removeNullColumns = opt[Boolean]()
+    val scaledFeatures = opt[Boolean]()
+
   }
 
 
 }
 
-case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String, outputName: String,
-                                  removeNullColumns: Boolean, outputOneFile: Boolean,
-                                  vectorAssembling: Boolean, scaledFeatures: Boolean
-                                 ) extends LineArgumentValuesTrait
-
-case class ConfigValues(dataDir: String) extends ConfigValuesTrait
-
-class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
-  val inputName = trailArg[String]()
-  val outputName = trailArg[String]()
-
-  val logCountsAndTimes = opt[Boolean]()
-  val outputOneFile = opt[Boolean]()
-
-  val removeNullColumns = opt[Boolean]()
-  val vectorAssembling = opt[Boolean]()
-  val scaledFeatures = opt[Boolean]()
-
-}

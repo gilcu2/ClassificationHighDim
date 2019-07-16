@@ -16,4 +16,11 @@ spark-submit \
 --conf "spark.driver.extraClassPath=$CONFIGPATH" \
 $PROGRAM $* 2>$ERROUT |tee $OUT
 
+rc=$?
+
 echo Output is in $OUT, error output in $ERROUT
+
+if [[ $rc != 0 ]]; then
+    echo Houston
+    less $ERROUT;
+fi

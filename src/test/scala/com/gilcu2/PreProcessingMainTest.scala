@@ -30,8 +30,8 @@ class PreProcessingMainTest extends FlatSpec with Matchers with GivenWhenThen wi
     val withFeatureVector = data.toFeatureVector
 
     And("the scaling pipeline")
-    val (scaleStage, selectorStage) = PreProcessingMain.makeScalerStage(true, true)
-    val pipeline = new Pipeline().setStages(Array(scaleStage.get, selectorStage.get))
+    val (scaleStage, selectorStage) = PreProcessingMain.makeScalerStage
+    val pipeline = new Pipeline().setStages(Array(scaleStage, selectorStage))
     val model = pipeline.fit(withFeatureVector)
 
     When("normalize")
