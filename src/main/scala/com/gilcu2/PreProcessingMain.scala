@@ -29,17 +29,34 @@ object PreProcessingMain extends MainTrait {
     data.persist
     data.smartShow(inputPath)
 
-    val withVectors = toVectors(lineArguments, data)
+    val (withVectors, vectorPipeline) = toVectors(lineArguments, data)
 
-    val scaled = if (lineArguments.scaledFeatures) scaleVector(withVectors) else withVectors
+    val (scaled, scalerPipeline) = if
+    (lineArguments.scaledFeatures) scaleVector(withVectors)
+    else (withVectors, None)
 
     val withLabeledPoint = scaled.toLabeledPoints
 
     withLabeledPoint.save(outputPath, Svm)
 
+    if (lineArguments.pipelineName.nonEmpty)
+      savePipeline(lineArguments.pipelineName, vectorPipeline, scalerPipeline, configValues)
+
   }
 
-  private def scaleVector(withVectors: DataFrame) = {
+  def savePipeline(pipelineName: String, vectorPipeline: Pipeline, scalerPipeline: Option[Pipeline],
+                   config: ConfigValues): Unit = {
+
+    val vectorPipelinePath = s"${config.pipelinesDir}$pipelineName-vector.pipeline"
+    vectorPipeline.write.overwrite().save(vectorPipelinePath)
+
+    if (scalerPipeline.nonEmpty) {
+      val scalerPipelinePath = s"${config.pipelinesDir}$pipelineName-scaled.pipeline"
+      scalerPipeline.get.write.overwrite().save(scalerPipelinePath)
+    }
+  }
+
+  private def scaleVector(withVectors: DataFrame): (DataFrame, Option[Pipeline]) = {
     val (scaler, afterScalerMapper) = makeScalerStage
 
     val pipeline = new Pipeline().setStages(Array(scaler, afterScalerMapper))
@@ -47,10 +64,10 @@ object PreProcessingMain extends MainTrait {
     val model = pipeline.fit(withVectors)
 
     val processed = model.transform(withVectors)
-    processed
+    (processed, Some(pipeline))
   }
 
-  def toVectors(lineArguments: CommandParameterValues, data: DataFrame): DataFrame = {
+  def toVectors(lineArguments: CommandParameterValues, data: DataFrame): (DataFrame, Pipeline) = {
     val nullColumnsRemover = makeNullColumnsRemoverStage(lineArguments.removeNullColumns)
     val vectorAssembler = makeVectorAssemblerStage
 
@@ -60,7 +77,7 @@ object PreProcessingMain extends MainTrait {
     val model = pipeline.fit(data)
 
     val processed = model.transform(data)
-    processed
+    (processed, pipeline)
   }
 
   def makeVectorAssemblerStage: Option[VectorAssemblerEstimator] = Some(new VectorAssemblerEstimator)
@@ -76,15 +93,16 @@ object PreProcessingMain extends MainTrait {
       scaler.setOutputCol(tempColumn)
 
       val mapper = new ColumnMapper
-      mapper.setColumnMapping(Map(FEATURES_FIELD -> None, tempColumn -> Some(FEATURES_FIELD)))
+    mapper.setColumnMapping(Map(FEATURES_FIELD -> "", tempColumn -> FEATURES_FIELD))
 
     (scaler, mapper)
   }
 
   def getConfigValues(conf: Config): ConfigValuesTrait = {
     val dataDir = conf.getString("DataDir")
+    val pipelineDir = conf.getString("PipelineDir")
 
-    ConfigValues(dataDir)
+    ConfigValues(dataDir, pipelineDir)
   }
 
   def getLineArgumentsValues(args: Array[String], configValues: ConfigValuesTrait): LineArgumentValuesTrait = {
@@ -95,6 +113,7 @@ object PreProcessingMain extends MainTrait {
     val logCountsAndTimes = parsedArgs.logCountsAndTimes()
     val inputName = parsedArgs.inputName()
     val outputName = parsedArgs.outputName()
+    val pipeLineName = parsedArgs.pipeLineName()
 
     val removeNullColumns = parsedArgs.removeNullColumns()
     val scaledFeatures = parsedArgs.scaledFeatures()
@@ -102,15 +121,15 @@ object PreProcessingMain extends MainTrait {
 
 
     CommandParameterValues(logCountsAndTimes, inputName, outputName, removeNullColumns, scaledFeatures,
-      outputOneFile)
+      outputOneFile, pipeLineName)
   }
 
   case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String, outputName: String,
                                     removeNullColumns: Boolean, scaledFeatures: Boolean,
-                                    outputOneFile: Boolean
+                                    outputOneFile: Boolean, pipelineName: String
                                    ) extends LineArgumentValuesTrait
 
-  case class ConfigValues(dataDir: String) extends ConfigValuesTrait
+  case class ConfigValues(dataDir: String, pipelinesDir: String) extends ConfigValuesTrait
 
   class CommandLineParameterConf(arguments: Seq[String]) extends ScallopConf(arguments) {
     val inputName = trailArg[String]()
@@ -121,6 +140,8 @@ object PreProcessingMain extends MainTrait {
 
     val removeNullColumns = opt[Boolean]()
     val scaledFeatures = opt[Boolean]()
+
+    val pipeLineName = opt[String](default = Some(""))
 
   }
 

@@ -37,12 +37,15 @@ trait MainTrait extends LazyLogging {
 
     try {
       process(configValues, lineArguments)
+      println("Terminating Ok")
     }
     catch {
       case e: Throwable =>
         logger.error(e.toString)
+        println("\n*****************************\nTerminating with Error\n*******************\n")
         println(e)
         e.getStackTrace.foreach(println)
+        println("\n*******************************\n")
     }
     finally {
       val endTime = getCurrentTime

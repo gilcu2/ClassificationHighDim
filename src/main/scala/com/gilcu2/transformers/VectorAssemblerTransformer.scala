@@ -7,12 +7,13 @@ import org.apache.spark.ml.Model
 import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.ml.linalg.VectorUDT
 import org.apache.spark.ml.param.{Param, ParamMap}
+import org.apache.spark.ml.util.DefaultParamsWritable
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Dataset}
 
 
 class VectorAssemblerTransformer(override val uid: String = "VectorAssemblerTransformer") extends
-  Model[VectorAssemblerTransformer] with LazyLogging {
+  Model[VectorAssemblerTransformer] with DefaultParamsWritable with LazyLogging {
 
   final val inputColumns: Param[Array[String]] =
     new Param[Array[String]](this, "inputColumns", "Columns to transform in feature vector")

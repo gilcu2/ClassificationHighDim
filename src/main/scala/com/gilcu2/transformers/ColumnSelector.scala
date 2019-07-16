@@ -2,12 +2,13 @@ package com.gilcu2.transformers
 
 import org.apache.spark.ml.Model
 import org.apache.spark.ml.param.{Param, ParamMap}
+import org.apache.spark.ml.util.DefaultParamsWritable
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Dataset}
 
 
 class ColumnSelector(override val uid: String = "ColumnSelector") extends
-  Model[ColumnSelector] {
+  Model[ColumnSelector] with DefaultParamsWritable {
 
   final val outputColumns: Param[Array[String]] =
     new Param[Array[String]](this, "outputColumns", "Columns to left")

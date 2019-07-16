@@ -2,14 +2,15 @@ package com.gilcu2.estimators
 
 import com.gilcu2.datasets.DatasetExtension._
 import com.gilcu2.transformers.ColumnSelector
+import org.apache.hadoop.io.Writable
 import org.apache.spark.ml.Estimator
 import org.apache.spark.ml.param.ParamMap
-import org.apache.spark.ml.util.Identifiable
+import org.apache.spark.ml.util.{DefaultParamsWritable, Identifiable}
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.types.StructType
 
 class NullColumnsRemover(override val uid: String = Identifiable.randomUID("NullColumnsRemover"))
-  extends Estimator[ColumnSelector] {
+  extends Estimator[ColumnSelector] with DefaultParamsWritable {
 
   override def fit(dataset: Dataset[_]): ColumnSelector = {
     println(s"NullColumnsRemover beginning: ${dataset.columns.mkString(",")}")

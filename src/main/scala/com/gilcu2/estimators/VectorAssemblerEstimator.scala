@@ -7,12 +7,12 @@ import com.typesafe.scalalogging.LazyLogging
 import org.apache.spark.ml.Estimator
 import org.apache.spark.ml.feature.VectorAssembler
 import org.apache.spark.ml.param.ParamMap
-import org.apache.spark.ml.util.Identifiable
+import org.apache.spark.ml.util.{DefaultParamsWritable, Identifiable}
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.types.StructType
 
 class VectorAssemblerEstimator(override val uid: String = Identifiable.randomUID("VectorAssemblerEstimator"))
-  extends Estimator[VectorAssemblerTransformer] with LazyLogging {
+  extends Estimator[VectorAssemblerTransformer] with DefaultParamsWritable with LazyLogging {
 
   override def fit(dataset: Dataset[_]): VectorAssemblerTransformer = {
     logger.info(s"VectorAssemblerEstimator beginning: ${dataset.columns.mkString(",")}")
