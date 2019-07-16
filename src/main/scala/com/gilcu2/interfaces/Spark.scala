@@ -1,7 +1,7 @@
 package com.gilcu2.interfaces
 
-import org.apache.spark.sql._
 import org.apache.spark.SparkConf
+import org.apache.spark.sql._
 
 object Spark {
 

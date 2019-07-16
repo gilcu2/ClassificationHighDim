@@ -1,12 +1,13 @@
 package com.gilcu2.transformers
 
-import org.apache.spark.ml.Transformer
+import org.apache.spark.ml.Model
 import org.apache.spark.ml.param.{Param, ParamMap}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Dataset}
 
 
-class ColumnSelector(override val uid: String = "ColumnSelector") extends Transformer {
+class ColumnSelector(override val uid: String = "ColumnSelector") extends
+  Model[ColumnSelector] {
 
   final val outputColumns: Param[Array[String]] =
     new Param[Array[String]](this, "outputColumns", "Columns to left")
@@ -34,6 +35,6 @@ class ColumnSelector(override val uid: String = "ColumnSelector") extends Transf
     StructType(schema.filter(field => desiredFields.contains(field.name)))
   }
 
-  override def copy(extra: ParamMap): Transformer = defaultCopy(extra)
+  override def copy(extra: ParamMap): ColumnSelector = defaultCopy(extra)
 
 }

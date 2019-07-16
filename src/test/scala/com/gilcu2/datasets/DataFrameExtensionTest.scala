@@ -1,11 +1,11 @@
 package com.gilcu2.datasets
 
+import com.gilcu2.datasets.DatasetExtension._
 import com.gilcu2.interfaces.Spark.loadCSVFromLines
-import com.gilcu2.datasets.DataFrameExtension._
+import org.apache.spark.ml.linalg
 import org.scalatest.{FlatSpec, GivenWhenThen, Matchers}
 import testUtil.SparkSessionTestWrapper
 import testUtil.UtilTest._
-import org.apache.spark.ml.linalg
 
 class DataFrameExtensionTest extends FlatSpec with Matchers with GivenWhenThen with SparkSessionTestWrapper {
 

@@ -1,16 +1,14 @@
 package com.gilcu2.interfaces
 
+import com.gilcu2.interfaces.Spark._
 import org.scalatest.{FlatSpec, GivenWhenThen, Matchers}
 import testUtil.SparkSessionTestWrapper
-import Spark._
 
 class SparkTest extends FlatSpec with Matchers with GivenWhenThen with SparkSessionTestWrapper {
 
   behavior of "Spark"
 
   implicit val sparkSession = spark
-
-  import spark.implicits._
 
   it should "load the data from csv lines" in {
 

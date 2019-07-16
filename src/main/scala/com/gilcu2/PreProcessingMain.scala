@@ -1,21 +1,23 @@
 package com.gilcu2
 
+import com.gilcu2.datasets.DatasetExtension._
+import com.gilcu2.datasets.Json
+import com.gilcu2.estimators.NullColumnsRemover
 import com.gilcu2.interfaces._
+import com.gilcu2.transformers.{ColumnMapper, ColumnSelector}
 import com.typesafe.config.Config
+import org.apache.spark.ml.Pipeline
+import org.apache.spark.ml.feature.{CountVectorizer, MinMaxScaler, VectorAssembler}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.rogach.scallop.ScallopConf
-import com.gilcu2.datasets.DataFrameExtension._
-import com.gilcu2.datasets.DatasetExtension._
-import com.gilcu2.datasets.{Json, Svm}
-import com.gilcu2.transformers.{ColumnMapper, ColumnSelector}
-import org.apache.spark.ml.Pipeline
-import org.apache.spark.ml.feature.{MinMaxScaler, VectorAssembler}
 
 object PreProcessingMain extends MainTrait {
 
   def process(configValues0: ConfigValuesTrait, lineArguments0: LineArgumentValuesTrait)(
     implicit spark: SparkSession
   ): Unit = {
+
+    val countVectorizer = new CountVectorizer()
 
     val configValues = configValues0.asInstanceOf[ConfigValues]
     val lineArguments = lineArguments0.asInstanceOf[CommandParameterValues]
@@ -27,8 +29,8 @@ object PreProcessingMain extends MainTrait {
     data.persist
     data.smartShow(inputPath)
 
-    val (removerColumnsWithNull, columns) = makeRemoveNullColumnsStage(lineArguments, data)
-    val (vectorAssembler, selectorAferAssembler) = makeVectorAssemblerStage(lineArguments, columns)
+    val nullColumnsRemover = makeNullColumnsRemoverStage(lineArguments.removeNullColumns)
+    val (vectorAssembler, selectorAferAssembler) = makeVectorAssemblerStage(lineArguments)
     val (scaler, afterScalerMapper) = makeScalerStage(lineArguments.vectorAssembling,
       lineArguments.scaledFeatures)
 
@@ -59,9 +61,9 @@ object PreProcessingMain extends MainTrait {
       (Some(scaler), Some(mapper))
     } else (None, None)
 
-  def makeVectorAssemblerStage(lineArguments: CommandParameterValues, columns: Array[String])
+  def makeVectorAssemblerStage(vectorAssembling: Boolean)
   : (Option[VectorAssembler], Option[ColumnSelector]) =
-    if (lineArguments.vectorAssembling) {
+    if (vectorAssembling) {
       val vectorAssembler = new VectorAssembler
       val featureColumns = (columns.toSet - CLASS_FIELD).toArray
       vectorAssembler.setInputCols(featureColumns).setOutputCol(FEATURES_FIELD)
@@ -74,16 +76,9 @@ object PreProcessingMain extends MainTrait {
     } else (None, None)
 
 
-  def makeRemoveNullColumnsStage(lineArguments: CommandParameterValues, data: DataFrame)
-  : (Option[ColumnSelector], Array[String]) =
-    if (lineArguments.removeNullColumns) {
-      val notNullColumns = data.countNullsPerColumn.filter(_._2 == 0).map(_._1).toArray
-
-      val transformer = new ColumnSelector
-      transformer.setOutputColumns(notNullColumns)
-
-      (Some(transformer), notNullColumns)
-    } else (None, data.columns)
+  def makeNullColumnsRemoverStage(removeNullColumns: Boolean)
+  : (Option[NullColumnsRemover]) =
+    if (removeNullColumns) Some(new NullColumnsRemover()) else None
 
   def getConfigValues(conf: Config): ConfigValuesTrait = {
     val dataDir = conf.getString("DataDir")

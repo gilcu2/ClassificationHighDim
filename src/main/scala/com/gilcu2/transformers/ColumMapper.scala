@@ -2,10 +2,11 @@ package com.gilcu2.transformers
 
 import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.param.{Param, ParamMap}
+import org.apache.spark.ml.util.Identifiable
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Dataset}
 
-class ColumnMapper(override val uid: String = "ColumnMapper") extends Transformer {
+class ColumnMapper(override val uid: String = Identifiable.randomUID("ColumnMapper")) extends Transformer {
 
   final val columnMapping: Param[Map[String, Option[String]]] =
     new Param[Map[String, Option[String]]](this, "columnMapping",
@@ -48,6 +49,6 @@ class ColumnMapper(override val uid: String = "ColumnMapper") extends Transforme
     StructType(withRenamedFields)
   }
 
-  override def copy(extra: ParamMap): Transformer = defaultCopy(extra)
+  override def copy(extra: ParamMap): ColumnMapper = defaultCopy(extra)
 
 }
