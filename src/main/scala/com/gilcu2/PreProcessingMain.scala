@@ -1,14 +1,12 @@
 package com.gilcu2
 
 import com.gilcu2.datasets.DatasetExtension._
-import com.gilcu2.datasets.{Json, Svm}
-import com.gilcu2.estimators.{NullColumnsRemover, VectorAssemblerEstimator}
+import com.gilcu2.datasets.Svm
 import com.gilcu2.interfaces._
-import com.gilcu2.transformers.{ColumnMapper, ColumnSelector}
+import com.gilcu2.preprocessing.Preprocessing._
 import com.typesafe.config.Config
 import org.apache.spark.ml.Pipeline
-import org.apache.spark.ml.feature.{CountVectorizer, MinMaxScaler, VectorAssembler}
-import org.apache.spark.sql.{DataFrame, SparkSession}
+import org.apache.spark.sql.SparkSession
 import org.rogach.scallop.ScallopConf
 
 object PreProcessingMain extends MainTrait {
@@ -16,8 +14,6 @@ object PreProcessingMain extends MainTrait {
   def process(configValues0: ConfigValuesTrait, lineArguments0: LineArgumentValuesTrait)(
     implicit spark: SparkSession
   ): Unit = {
-
-    val countVectorizer = new CountVectorizer()
 
     val configValues = configValues0.asInstanceOf[ConfigValues]
     val lineArguments = lineArguments0.asInstanceOf[CommandParameterValues]
@@ -29,18 +25,18 @@ object PreProcessingMain extends MainTrait {
     data.persist
     data.smartShow(inputPath)
 
-    val (withVectors, vectorPipeline) = toVectors(lineArguments, data)
+    val (withVectors, vectorPipeline) = makeApplyToVectorPipeline(lineArguments.removeNullColumns, data)
 
-    val (scaled, scalerPipeline) = if
-    (lineArguments.scaledFeatures) scaleVector(withVectors)
-    else (withVectors, None)
+    val (afterVector, afterVectorPipeline) =
+      makeApplyAfterVectorPipeline(withVectors, lineArguments.scaledFeatures, lineArguments.maxForCategories)
 
-    val withLabeledPoint = scaled.toLabeledPoints
+
+    val withLabeledPoint = afterVector.toLabeledPoints
 
     withLabeledPoint.save(outputPath, Svm)
 
     if (lineArguments.pipelineName.nonEmpty)
-      savePipeline(lineArguments.pipelineName, vectorPipeline, scalerPipeline, configValues)
+      savePipeline(lineArguments.pipelineName, vectorPipeline, afterVectorPipeline, configValues)
 
   }
 
@@ -56,47 +52,6 @@ object PreProcessingMain extends MainTrait {
     }
   }
 
-  private def scaleVector(withVectors: DataFrame): (DataFrame, Option[Pipeline]) = {
-    val (scaler, afterScalerMapper) = makeScalerStage
-
-    val pipeline = new Pipeline().setStages(Array(scaler, afterScalerMapper))
-
-    val model = pipeline.fit(withVectors)
-
-    val processed = model.transform(withVectors)
-    (processed, Some(pipeline))
-  }
-
-  def toVectors(lineArguments: CommandParameterValues, data: DataFrame): (DataFrame, Pipeline) = {
-    val nullColumnsRemover = makeNullColumnsRemoverStage(lineArguments.removeNullColumns)
-    val vectorAssembler = makeVectorAssemblerStage
-
-    val stages = Array(nullColumnsRemover, vectorAssembler).filter(_.nonEmpty).map(_.get)
-    val pipeline = new Pipeline().setStages(stages)
-
-    val model = pipeline.fit(data)
-
-    val processed = model.transform(data)
-    (processed, pipeline)
-  }
-
-  def makeVectorAssemblerStage: Option[VectorAssemblerEstimator] = Some(new VectorAssemblerEstimator)
-
-  def makeNullColumnsRemoverStage(removeNullColumns: Boolean): (Option[NullColumnsRemover]) =
-    if (removeNullColumns) Some(new NullColumnsRemover()) else None
-
-  def makeScalerStage: (MinMaxScaler, ColumnMapper) = {
-      val tempColumn = FEATURES_FIELD + "Scaled"
-
-      val scaler = new MinMaxScaler
-      scaler.setInputCol(FEATURES_FIELD)
-      scaler.setOutputCol(tempColumn)
-
-      val mapper = new ColumnMapper
-    mapper.setColumnMapping(Map(FEATURES_FIELD -> "", tempColumn -> FEATURES_FIELD))
-
-    (scaler, mapper)
-  }
 
   def getConfigValues(conf: Config): ConfigValuesTrait = {
     val dataDir = conf.getString("DataDir")
@@ -117,15 +72,18 @@ object PreProcessingMain extends MainTrait {
 
     val removeNullColumns = parsedArgs.removeNullColumns()
     val scaledFeatures = parsedArgs.scaledFeatures()
+    val maxForCategories = parsedArgs.maxForCategories()
+
     val outputOneFile = parsedArgs.outputOneFile()
 
 
-    CommandParameterValues(logCountsAndTimes, inputName, outputName, removeNullColumns, scaledFeatures,
+    CommandParameterValues(logCountsAndTimes, inputName, outputName, removeNullColumns,
+      scaledFeatures, maxForCategories,
       outputOneFile, pipeLineName)
   }
 
   case class CommandParameterValues(logCountsAndTimes: Boolean, inputName: String, outputName: String,
-                                    removeNullColumns: Boolean, scaledFeatures: Boolean,
+                                    removeNullColumns: Boolean, scaledFeatures: Boolean, maxForCategories: Int,
                                     outputOneFile: Boolean, pipelineName: String
                                    ) extends LineArgumentValuesTrait
 
@@ -139,7 +97,9 @@ object PreProcessingMain extends MainTrait {
     val outputOneFile = opt[Boolean]()
 
     val removeNullColumns = opt[Boolean]()
+
     val scaledFeatures = opt[Boolean]()
+    val maxForCategories = opt[Int](default = Some(1))
 
     val pipeLineName = opt[String](default = Some(""))
 
