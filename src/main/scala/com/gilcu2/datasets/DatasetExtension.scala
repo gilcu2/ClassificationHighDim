@@ -24,7 +24,14 @@ object DatasetExtension {
       println(s"$pathWithExt saved")
     }
 
-    def hasColumn(name: String): Boolean = ds.columns.contains(name)
+    def transform[TI, TO](source: Dataset[TI], f: Dataset[TI] => Dataset[TO], label: String): Dataset[TO] = {
+      val ds = f(source)
+      ds.persist()
+
+      ds.smartShow(label)
+      source.unpersist()
+      ds
+    }
 
     def smartShow(label: String): Unit = {
       println(s"\nFirst rows with some columns of $label")
@@ -37,30 +44,7 @@ object DatasetExtension {
       dataToShow.show(10, 10)
     }
 
-    def transform[TI, TO](source: Dataset[TI], f: Dataset[TI] => Dataset[TO], label: String): Dataset[TO] = {
-      val ds = f(source)
-      ds.persist()
-
-      ds.smartShow(label)
-      source.unpersist()
-      ds
-    }
-
-    def countNullsPerColumn: Seq[(String, Long)] = {
-      val allColumns = ds.columns
-      val rowResults = ds
-        .select(allColumns.map(c => sum(when(col(c).isNull, 1)).alias(c)): _*)
-        .head()
-
-      allColumns.indices.map(col =>
-        if (rowResults.isNullAt(col))
-          (allColumns(col), 0L)
-        else
-          (allColumns(col), rowResults.getLong(col))
-      )
-        .sortBy(_._2)
-        .reverse
-    }
+    def hasColumn(name: String): Boolean = ds.columns.contains(name)
 
     def countRowsWithNullOrEmptyString: Long = {
       val cond = ds.columns.map(x => col(x).isNull || col(x) === "").reduce(_ || _)
@@ -85,21 +69,45 @@ object DatasetExtension {
       ds.select(columnsWithoutNull.head, columnsWithoutNull.tail: _*)
     }
 
-    def toFeatureVector: DataFrame = {
+    def countNullsPerColumn: Seq[(String, Long)] = {
+      val allColumns = ds.columns
+      val rowResults = ds
+        .select(allColumns.map(c => sum(when(col(c).isNull, 1)).alias(c)): _*)
+        .head()
+
+      allColumns.indices.map(col =>
+        if (rowResults.isNullAt(col))
+          (allColumns(col), 0L)
+        else
+          (allColumns(col), rowResults.getLong(col))
+      )
+        .sortBy(_._2)
+        .reverse
+    }
+
+    def toFeatureVector(removeAllColumns: Boolean = true,
+                        inputColumns: Array[String] = Array(),
+                        outputColumn: String = FEATURES_FIELD
+                       ): DataFrame = {
 
       println(s"toFeatureVector ${Time.getCurrentTime}")
 
-      val (columns, featureColumns) = getFeaturedColumns
+      val (columns, featureColumns) = if (inputColumns.isEmpty)
+        getFeaturedColumns
+      else (ds.columns.toSet -- inputColumns.toSet, inputColumns)
       val hasClassColumn = columns.contains(CLASS_FIELD)
       val assembler = new VectorAssembler()
         .setInputCols(featureColumns)
-        .setOutputCol(FEATURES_FIELD)
+        .setOutputCol(outputColumn)
 
       val withFeatures = assembler.transform(ds)
-      if (hasClassColumn)
-        withFeatures.select(CLASS_FIELD, FEATURES_FIELD)
-      else
-        withFeatures.select(FEATURES_FIELD)
+      if (removeAllColumns) {
+        if (hasClassColumn)
+          withFeatures.select(CLASS_FIELD, outputColumn)
+        else
+          withFeatures.select(outputColumn)
+      }
+      else withFeatures
     }
 
     def getFeaturedColumns: (Set[String], Array[String]) = {

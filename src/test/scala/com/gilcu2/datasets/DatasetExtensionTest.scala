@@ -91,7 +91,7 @@ class DatasetExtensionTest extends FlatSpec with Matchers with GivenWhenThen wit
     val data = loadCSVFromLines(spark.createDataset(lines))
 
     When("the data is transformed")
-    val withFeatureVector = data.toFeatureVector
+    val withFeatureVector = data.toFeatureVector()
 
     Then("the columns with null must be A,B")
     withFeatureVector.columns shouldBe Array("y", "features")
@@ -110,7 +110,7 @@ class DatasetExtensionTest extends FlatSpec with Matchers with GivenWhenThen wit
         |1,0,0,4
       """.cleanLines
     val data = loadCSVFromLines(spark.createDataset(lines))
-    val withFeatureVector = data.toFeatureVector
+    val withFeatureVector = data.toFeatureVector()
 
     When("normalize")
     val scaled = withFeatureVector.scaleFeatures
@@ -132,7 +132,7 @@ class DatasetExtensionTest extends FlatSpec with Matchers with GivenWhenThen wit
         |1,0.0,0,2
       """.cleanLines
     val data = loadCSVFromLines(spark.createDataset(lines))
-    val withFeatureVector = data.toFeatureVector
+    val withFeatureVector = data.toFeatureVector()
 
     When("the data is transformed")
     val withLabeledPoint = withFeatureVector.toLabeledPoints
